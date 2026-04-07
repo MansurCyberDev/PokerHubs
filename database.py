@@ -59,6 +59,25 @@ async def init_db():
             )
         ''')
 
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS kaspi_payments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                username TEXT,
+                first_name TEXT,
+                item_type TEXT,
+                item_id TEXT,
+                amount_kzt INTEGER,
+                amount_item INTEGER,
+                status TEXT DEFAULT 'pending',
+                receipt_photo_id TEXT,
+                admin_comment TEXT,
+                created_at TEXT,
+                processed_at TEXT,
+                processed_by INTEGER
+            )
+        ''')
+
         await db.commit()
         
         # Enable WAL mode for better concurrency (high load optimization)
@@ -337,3 +356,199 @@ async def get_leaderboard(limit: int = 10) -> List[Dict]:
         ''', (limit,)) as cursor:
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]
+
+
+# ==================== KASPI PAYMENTS ====================
+
+KASPI_PRICES = {
+    # Фишки
+    "chips_10k": {"amount": 10000, "price_kzt": 500, "name": "10 000 фишек"},
+    "chips_50k": {"amount": 50000, "price_kzt": 2000, "name": "50 000 фишек"},
+    "chips_100k": {"amount": 100000, "price_kzt": 3500, "name": "100 000 фишек"},
+    "chips_500k": {"amount": 500000, "price_kzt": 15000, "name": "500 000 фишек"},
+    # Gold
+    "gold_100": {"amount": 100, "price_kzt": 300, "name": "100 Gold"},
+    "gold_500": {"amount": 500, "price_kzt": 1200, "name": "500 Gold"},
+    "gold_1000": {"amount": 1000, "price_kzt": 2000, "name": "1000 Gold"},
+    "gold_5000": {"amount": 5000, "price_kzt": 8500, "name": "5000 Gold"},
+    # Скины (цена за скин)
+    "skin_premium": {"amount": 1, "price_kzt": 2000, "name": "Premium скин карт"},
+    "table_premium": {"amount": 1, "price_kzt": 3000, "name": "Premium скин стола"},
+}
+
+async def create_kaspi_payment(user_id: int, username: str, first_name: str, 
+                                item_type: str, item_id: str, 
+                                amount_kzt: int, amount_item: int) -> int:
+    """Создать новый платёж. Возвращает ID платежа."""
+    from datetime import datetime
+    async with aiosqlite.connect(DB_NAME) as db:
+        cursor = await db.execute('''
+            INSERT INTO kaspi_payments (user_id, username, first_name, item_type, item_id,
+                                       amount_kzt, amount_item, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+        ''', (user_id, username, first_name, item_type, item_id, 
+              amount_kzt, amount_item, datetime.now().isoformat()))
+        await db.commit()
+        return cursor.lastrowid
+
+
+async def get_kaspi_payment(payment_id: int) -> Optional[Dict]:
+    """Получить информацию о платеже по ID"""
+    async with aiosqlite.connect(DB_NAME) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM kaspi_payments WHERE id = ?", (payment_id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            return dict(row) if row else None
+
+
+async def get_pending_payments() -> List[Dict]:
+    """Получить все ожидающие платежи для админ-панели"""
+    async with aiosqlite.connect(DB_NAME) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute('''
+            SELECT * FROM kaspi_payments 
+            WHERE status = 'pending' 
+            ORDER BY created_at DESC
+        ''') as cursor:
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+
+
+async def get_user_payments(user_id: int, limit: int = 10) -> List[Dict]:
+    """Получить историю платежей пользователя"""
+    async with aiosqlite.connect(DB_NAME) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute('''
+            SELECT * FROM kaspi_payments 
+            WHERE user_id = ? 
+            ORDER BY created_at DESC 
+            LIMIT ?
+        ''', (user_id, limit)) as cursor:
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+
+
+async def add_receipt_to_payment(payment_id: int, photo_file_id: str) -> bool:
+    """Добавить чек к существующему платежу"""
+    async with aiosqlite.connect(DB_NAME) as db:
+        await db.execute(
+            "UPDATE kaspi_payments SET receipt_photo_id = ? WHERE id = ?",
+            (photo_file_id, payment_id)
+        )
+        await db.commit()
+        return True
+
+
+async def approve_kaspi_payment(payment_id: int, admin_id: int, 
+                                admin_comment: str = "") -> Optional[Dict]:
+    """Одобрить платёж и начислить товар. Возвращает информацию о платеже."""
+    from datetime import datetime
+    async with aiosqlite.connect(DB_NAME) as db:
+        db.row_factory = aiosqlite.Row
+        
+        # Получаем платёж
+        async with db.execute(
+            "SELECT * FROM kaspi_payments WHERE id = ? AND status = 'pending'",
+            (payment_id,)
+        ) as cursor:
+            payment = await cursor.fetchone()
+        
+        if not payment:
+            return None
+        
+        payment = dict(payment)
+        
+        # Начисляем товар
+        if payment['item_type'] == 'chips':
+            await db.execute(
+                "UPDATE players SET current_balance = current_balance + ? WHERE user_id = ?",
+                (payment['amount_item'], payment['user_id'])
+            )
+        elif payment['item_type'] == 'gold':
+            await db.execute(
+                "UPDATE players SET gold = gold + ? WHERE user_id = ?",
+                (payment['amount_item'], payment['user_id'])
+            )
+        elif payment['item_type'] == 'card_skin':
+            # Добавляем скин в owned_skins и устанавливаем активным
+            await db.execute('''
+                UPDATE players 
+                SET owned_skins = json_insert(owned_skins, '$[#]', ?),
+                    card_skin = ?
+                WHERE user_id = ?
+            ''', (payment['item_id'], payment['item_id'], payment['user_id']))
+        elif payment['item_type'] == 'table_skin':
+            await db.execute('''
+                UPDATE players 
+                SET owned_table_skins = json_insert(owned_table_skins, '$[#]', ?),
+                    table_skin = ?
+                WHERE user_id = ?
+            ''', (payment['item_id'], payment['item_id'], payment['user_id']))
+        
+        # Обновляем статус платежа
+        await db.execute('''
+            UPDATE kaspi_payments 
+            SET status = 'approved', 
+                processed_at = ?, 
+                processed_by = ?,
+                admin_comment = ?
+            WHERE id = ?
+        ''', (datetime.now().isoformat(), admin_id, admin_comment, payment_id))
+        
+        await db.commit()
+        
+        # Возвращаем обновлённый платёж
+        async with db.execute("SELECT * FROM kaspi_payments WHERE id = ?", (payment_id,)) as cursor:
+            row = await cursor.fetchone()
+            return dict(row) if row else None
+
+
+async def reject_kaspi_payment(payment_id: int, admin_id: int, 
+                               reason: str) -> bool:
+    """Отклонить платёж с причиной"""
+    from datetime import datetime
+    async with aiosqlite.connect(DB_NAME) as db:
+        result = await db.execute('''
+            UPDATE kaspi_payments 
+            SET status = 'rejected', 
+                processed_at = ?, 
+                processed_by = ?,
+                admin_comment = ?
+            WHERE id = ? AND status = 'pending'
+        ''', (datetime.now().isoformat(), admin_id, reason, payment_id))
+        await db.commit()
+        return result.rowcount > 0
+
+
+async def get_payment_stats() -> Dict:
+    """Статистика платежей для админ-панели"""
+    async with aiosqlite.connect(DB_NAME) as db:
+        # Всего заявок
+        async with db.execute("SELECT COUNT(*) FROM kaspi_payments") as cursor:
+            total = (await cursor.fetchone())[0]
+        
+        # Ожидают
+        async with db.execute("SELECT COUNT(*) FROM kaspi_payments WHERE status = 'pending'") as cursor:
+            pending = (await cursor.fetchone())[0]
+        
+        # Одобрено
+        async with db.execute("SELECT COUNT(*) FROM kaspi_payments WHERE status = 'approved'") as cursor:
+            approved = (await cursor.fetchone())[0]
+        
+        # Отклонено
+        async with db.execute("SELECT COUNT(*) FROM kaspi_payments WHERE status = 'rejected'") as cursor:
+            rejected = (await cursor.fetchone())[0]
+        
+        # Сумма одобренных платежей
+        async with db.execute("SELECT SUM(amount_kzt) FROM kaspi_payments WHERE status = 'approved'") as cursor:
+            total_revenue = (await cursor.fetchone())[0] or 0
+        
+        return {
+            "total": total,
+            "pending": pending,
+            "approved": approved,
+            "rejected": rejected,
+            "total_revenue_kzt": total_revenue
+        }

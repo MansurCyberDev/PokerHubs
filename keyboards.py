@@ -127,6 +127,7 @@ def get_chips_packages_keyboard(lang: str = "ru", back_button: InlineKeyboardBut
     is_en = lang == "en"
     keyboard = [
         [InlineKeyboardButton("📺 " + ("Watch Ad — 3000 chips" if is_en else "Смотреть рекламу — 3000 фишек"), callback_data="chips_watch_ad")],
+        [InlineKeyboardButton("💳 " + ("Buy with Kaspi" if is_en else "Купить через Kaspi"), callback_data="kaspi_chips_menu")],
     ]
     # Add dynamic back button if provided, otherwise default to profile
     if back_button:
@@ -325,4 +326,104 @@ def get_bet_amounts_keyboard(current_bet: int, min_raise: int, player_stack: int
     ]
     keyboard.append(control_row)
     
+    return InlineKeyboardMarkup(keyboard)
+
+
+# ==================== KASPI PAY KEYBOARDS ====================
+
+def get_kaspi_chips_packages_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
+    """Пакеты фишек для покупки через Kaspi Pay."""
+    is_en = lang == "en"
+    keyboard = [
+        [InlineKeyboardButton(f"🪙 10 000 {'chips' if is_en else 'фишек'} — 500 ₸", callback_data="kaspi_chips_10k")],
+        [InlineKeyboardButton(f"🪙 50 000 {'chips' if is_en else 'фишек'} — 2 000 ₸", callback_data="kaspi_chips_50k")],
+        [InlineKeyboardButton(f"🪙 100 000 {'chips' if is_en else 'фишек'} — 3 500 ₸", callback_data="kaspi_chips_100k")],
+        [InlineKeyboardButton(f"🪙 500 000 {'chips' if is_en else 'фишек'} — 15 000 ₸ 🔥", callback_data="kaspi_chips_500k")],
+        [InlineKeyboardButton("🔙 " + ("Back" if is_en else "Назад"), callback_data="shop_category_chips")],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_kaspi_gold_packages_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
+    """Пакеты Gold для покупки через Kaspi Pay."""
+    is_en = lang == "en"
+    keyboard = [
+        [InlineKeyboardButton("💎 100 Gold — 300 ₸", callback_data="kaspi_gold_100")],
+        [InlineKeyboardButton("💎 500 Gold — 1 200 ₸", callback_data="kaspi_gold_500")],
+        [InlineKeyboardButton("💎 1 000 Gold — 2 000 ₸", callback_data="kaspi_gold_1000")],
+        [InlineKeyboardButton("💎 5 000 Gold — 8 500 ₸ 🔥", callback_data="kaspi_gold_5000")],
+        [InlineKeyboardButton("🔙 " + ("Back" if is_en else "Назад"), callback_data="menu_shop")],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_kaspi_payment_instruction_keyboard(payment_id: int, lang: str = "ru") -> InlineKeyboardMarkup:
+    """Клавиатура для инструкции по оплате (после создания заявки)."""
+    is_en = lang == "en"
+    keyboard = [
+        [InlineKeyboardButton(
+            "📤 " + ("I paid - Send receipt" if is_en else "Я оплатил - Отправить чек"), 
+            callback_data=f"kaspi_upload_{payment_id}"
+        )],
+        [InlineKeyboardButton(
+            "❌ " + ("Cancel payment" if is_en else "Отменить заявку"), 
+            callback_data=f"kaspi_cancel_{payment_id}"
+        )],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_kaspi_receipt_upload_keyboard(payment_id: int, lang: str = "ru") -> InlineKeyboardMarkup:
+    """Клавиатура для загрузки чека."""
+    is_en = lang == "en"
+    keyboard = [
+        [InlineKeyboardButton(
+            "📎 " + ("Send receipt photo" if is_en else "Отправить фото чека"), 
+            callback_data=f"kaspi_receipt_{payment_id}"
+        )],
+        [InlineKeyboardButton("🔙 " + ("Back" if is_en else "Назад"), callback_data="menu_main")],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_admin_kaspi_panel_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
+    """Админ-панель Kaspi платежей."""
+    is_en = lang == "en"
+    keyboard = [
+        [InlineKeyboardButton(
+            "⏳ " + ("Pending payments" if is_en else "Ожидающие заявки"), 
+            callback_data="admin_kaspi_pending"
+        )],
+        [InlineKeyboardButton(
+            "📊 " + ("Payment statistics" if is_en else "Статистика платежей"), 
+            callback_data="admin_kaspi_stats"
+        )],
+        [InlineKeyboardButton("🔙 " + ("Back" if is_en else "Назад"), callback_data="menu_main")],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_admin_payment_action_keyboard(payment_id: int, lang: str = "ru") -> InlineKeyboardMarkup:
+    """Клавиатура действий для админа над конкретной заявкой."""
+    is_en = lang == "en"
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "✅ " + ("Approve" if is_en else "Одобрить"), 
+                callback_data=f"admin_approve_{payment_id}"
+            ),
+            InlineKeyboardButton(
+                "❌ " + ("Reject" if is_en else "Отклонить"), 
+                callback_data=f"admin_reject_{payment_id}"
+            ),
+        ],
+        [InlineKeyboardButton(
+            "📝 " + ("Approve with comment" if is_en else "Одобрить с комментом"), 
+            callback_data=f"admin_approve_comment_{payment_id}"
+        )],
+        [InlineKeyboardButton(
+            "📋 " + ("Next pending" if is_en else "Следующая заявка"), 
+            callback_data="admin_kaspi_pending"
+        )],
+    ]
     return InlineKeyboardMarkup(keyboard)

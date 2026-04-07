@@ -15,6 +15,9 @@ from handlers import (
     game_settings_callback, game_settings_value_callback, admin_command,
     inventory_command, inventory_callback, shop_command
 )
+from kaspi_handlers import (
+    kaspi_callback, kaspi_receipt_photo_handler, admin_kaspi_callback, admin_kaspi_text_handler
+)
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -72,6 +75,8 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     else:
         logging.error(f"Exception while handling an update: {context.error}")
 
+from telegram.error import NetworkError, RetryAfter, TimedOut
+
 def main():
     application = Application.builder().token(TOKEN).post_init(post_init).build()
 
@@ -109,14 +114,47 @@ def main():
     application.add_handler(CallbackQueryHandler(language_callback, pattern="^lang_"))
     application.add_handler(CallbackQueryHandler(inventory_callback, pattern="^inv_"))
 
+    # Kaspi Pay handlers
+    application.add_handler(CallbackQueryHandler(kaspi_callback, pattern="^kaspi_"))
+    application.add_handler(CallbackQueryHandler(admin_kaspi_callback, pattern="^admin_kaspi_|^admin_approve_|^admin_reject_"))
+    
+    # Фото чеков Kaspi (высший приоритет в группе фото)
+    application.add_handler(MessageHandler(
+        filters.PHOTO & filters.ChatType.PRIVATE,
+        kaspi_receipt_photo_handler
+    ))
+
     # Один роутер для всего текстового ввода в ЛС:
-    # меню + ручной ввод ставки
+    # меню + ручной ввод ставки + админ комментарии Kaspi
     application.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE,
         private_text_router
     ))
-
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    
+    # Run with retry logic for network errors
+    import asyncio
+    import time
+    
+    max_retries = 10
+    retry_delay = 5
+    
+    for attempt in range(max_retries):
+        try:
+            print(f"🚀 Starting bot... (attempt {attempt + 1}/{max_retries})")
+            application.run_polling(allowed_updates=Update.ALL_TYPES)
+            break  # If successful, exit loop
+        except NetworkError as e:
+            print(f"⚠️ Network error: {e}")
+            if attempt < max_retries - 1:
+                print(f"⏳ Retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+                retry_delay = min(retry_delay * 2, 60)  # Exponential backoff, max 60s
+            else:
+                print("❌ Max retries reached. Please check your internet connection.")
+                raise
+        except Exception as e:
+            print(f"❌ Unexpected error: {e}")
+            raise
 
 
 if __name__ == "__main__":

@@ -1799,6 +1799,7 @@ def _is_admin(user_id: int) -> bool:
 def _admin_help_text() -> str:
     return (
         "🛠 <b>Админ-панель (команды)</b>\n\n"
+        "<code>/admin kaspi</code> — панель платежей Kaspi\n"
         "<code>/admin add_coins user_id amount</code> — добавить фишки\n"
         "<code>/admin remove_coins user_id amount</code> — убавить фишки\n"
         "<code>/admin add_gold user_id amount</code> — выдать донатное золото\n"
@@ -1820,6 +1821,24 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     cmd = args[0].lower()
+    
+    # Kaspi panel command
+    if cmd == "kaspi":
+        from keyboards import get_admin_kaspi_panel_keyboard
+        text = (
+            "💳 <b>KASPI PAY — АДМИН-ПАНЕЛЬ</b>\n"
+            "════════════════════\n\n"
+            "Управление платежами через Kaspi:\n\n"
+            "⏳ Просмотр ожидающих заявок\n"
+            "📊 Статистика платежей\n"
+            "✅/❌ Одобрение/отклонение"
+        )
+        await update.message.reply_text(
+            text,
+            reply_markup=get_admin_kaspi_panel_keyboard("ru"),
+            parse_mode=ParseMode.HTML
+        )
+        return
     
     # Special case: give_all_skins can work with just user_id (no value needed)
     if cmd == "give_all_skins":
@@ -2121,6 +2140,18 @@ async def text_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def private_text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != "private":
         return
+    
+    # Check for admin Kaspi operations first
+    user = update.effective_user
+    from config import ADMIN_IDS
+    if user.id in ADMIN_IDS:
+        # Check if admin is approving/rejecting with comment
+        if context.user_data.get('rejecting_payment') or context.user_data.get('approving_payment'):
+            # Delegate to kaspi admin handler
+            from kaspi_handlers import admin_kaspi_text_handler
+            await admin_kaspi_text_handler(update, context)
+            return
+    
     if context.user_data.get("awaiting_bet"):
         await custom_raise_handler(update, context)
         return
@@ -2348,15 +2379,18 @@ async def _handle_shop_page(query, context, user, lang, page_key, back_button):
             f"💰 <b>BUY CHIPS</b>\n════════════════════\n\n"
             f"Get more chips to play longer!\n\n"
             f"📺 Watch ad — 3000 chips (FREE)\n"
-            f"🎁 More packages coming soon!"
+            f"💳 Kaspi Pay — instant delivery\n"
+            f"   10K-500K chips packages"
             if lang == "en" else
             f"💰 <b>КУПИТЬ ФИШКИ</b>\n════════════════════\n\n"
             f"Получи больше фишек, чтобы играть дольше!\n\n"
             f"📺 Смотреть рекламу — 3000 фишек (БЕСПЛАТНО)\n"
-            f"🎁 Другие способы скоро появятся!"
+            f"💳 Kaspi Pay — мгновенное начисление\n"
+            f"   Пакеты от 10K до 500K фишек"
         )
         keyboard = [
-            [InlineKeyboardButton("📺 " + ("Watch Ad — 3000 chips" if lang == "en" else "Смотреть рекламу — 3000 фишек"), callback_data="chips_watch_ad")]
+            [InlineKeyboardButton("📺 " + ("Watch Ad — 3000 chips" if lang == "en" else "Смотреть рекламу — 3000 фишек"), callback_data="chips_watch_ad")],
+            [InlineKeyboardButton("💳 " + ("Buy with Kaspi Pay" if lang == "en" else "Купить через Kaspi"), callback_data="kaspi_chips_menu")],
         ]
         if back_button:
             keyboard.append([back_button])
