@@ -11,7 +11,7 @@ from telegram.error import RetryAfter, BadRequest
 from game_state import Game, Player, GamePhase, active_games, TURN_TIME
 from database import (
     get_player, update_stats, init_db, add_gold, buy_skin, set_skin, 
-    buy_table_skin, set_table_skin, buy_chip_skin, set_chip_skin, set_language, player_exists,
+    buy_table_skin, set_table_skin, set_language, player_exists,
     add_coins, set_luck_multiplier, DB_NAME
 )
 from keyboards import (
@@ -30,7 +30,7 @@ from utils import (
     get_applause_animation, get_timer_tick_emoji, format_mini_table_map
 )
 from cards import HandEvaluator
-from skins import SKINS, DEFAULT_SKIN, TABLE_SKINS, DEFAULT_TABLE_SKIN, CHIP_SKINS, DEFAULT_CHIP_SKIN
+from skins import SKINS, DEFAULT_SKIN, TABLE_SKINS, DEFAULT_TABLE_SKIN
 from config import MIN_PLAYERS, REGISTRATION_TIME, SMALL_BLIND, BIG_BLIND, ADMIN_IDS, SUPPORT_USERNAME
 
 # user_id -> active game chat_id (для работы кнопок из ЛС)
@@ -251,7 +251,7 @@ def push_nav_stack(context: ContextTypes.DEFAULT_TYPE, page: str):
     context.user_data[NAV_STACK_KEY] = stack
 
 
-def pop_nav_stack(context: ContextTypes.DEFAULT_TYPE) -> str | None:
+def pop_nav_stack(context: ContextTypes.DEFAULT_TYPE) -> Optional[str]:
     """Pop current page and return previous page"""
     stack = get_nav_stack(context)
     if not stack:
@@ -263,7 +263,7 @@ def pop_nav_stack(context: ContextTypes.DEFAULT_TYPE) -> str | None:
     return stack[-1] if stack else None
 
 
-def get_current_page(context: ContextTypes.DEFAULT_TYPE) -> str | None:
+def get_current_page(context: ContextTypes.DEFAULT_TYPE) -> Optional[str]:
     """Get current page from navigation stack"""
     stack = get_nav_stack(context)
     return stack[-1] if stack else None
@@ -1266,6 +1266,12 @@ async def process_action(context, chat_id: int, action: str, amount: int, auto: 
             )
             await context.bot.send_message(chat_id, text, parse_mode=ParseMode.HTML)
             
+            # Начисляем +5 золота за победу
+            try:
+                await add_gold(winner.user_id, 5)
+            except Exception as e:
+                print(f"Error adding gold to winner: {e}")
+            
             # Отправляем личное уведомление победителю
             try:
                 lang = await _user_lang(winner.user_id)
@@ -1275,7 +1281,9 @@ async def process_action(context, chat_id: int, action: str, amount: int, auto: 
                     f"{get_applause_animation()}\n"
                     f"✨ •═════════════• ✨\n"
                     f"💰 Выигрыш: <b>{prize}</b> фишек!\n"
+                    f"🪙 Бонус: <b>+5</b> золота!\n"
                     f"💨 Соперник сбросил карты.\n"
+                    f"🛒 Золото можно потратить в магазине!\n"
                     f"🏆 Поздравляем!"
                     if lang == "en" else
                     f"{get_win_effect(prize >= 1000)}\n\n"
@@ -1283,7 +1291,9 @@ async def process_action(context, chat_id: int, action: str, amount: int, auto: 
                     f"{get_applause_animation()}\n"
                     f"✨ •═════════════• ✨\n"
                     f"💰 Выигрыш: <b>{prize}</b> фишек!\n"
+                    f"🪙 Бонус: <b>+5</b> золота!\n"
                     f"💨 Соперник сбросил карты.\n"
+                    f"🛒 Золото можно потратить в магазине!\n"
                     f"🏆 Поздравляем!"
                 )
                 await safe_send_message(
@@ -1545,8 +1555,14 @@ async def handle_showdown(context, chat_id: int):
         if winner is None:
             continue  # Skip if winner not found
         winner.stack += amount
+        # Начисляем +5 золота за победу в вскрытии
+        try:
+            await add_gold(winner.user_id, 5)
+        except Exception as e:
+            print(f"Error adding gold to showdown winner: {e}")
         text += f"🏆 <b>ПОБЕДИТЕЛЬ: {winner.first_name}</b>\n"
         text += f"💰 ВЫИГРЫШ: <b>{amount}</b> фишек!\n"
+        text += f"🪙 БОНУС: <b>+5</b> золота!\n"
         text += f"🃏 КОМБИНАЦИЯ: <i>{best_hand_names.get(user_id, 'Unknown')}</i>\n\n"
 
     # Добавляем аплодисменты
@@ -1737,20 +1753,78 @@ async def rules_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def issue_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /issue command with usage example."""
     lang = await _user_lang(update.effective_user.id)
+    
+    # Check if user provided issue text
+    args = context.args
+    if not args:
+        # Show usage instructions
+        text = (
+            f"🛠 <b>ОТПРАВИТЬ СООБЩЕНИЕ РАЗРАБОТЧИКУ</b>\n"
+            f"════════════════════\n\n"
+            f"Чтобы отправить сообщение об ошибке или предложение, используй команду:\n\n"
+            f"<code>/issue [твой текст]</code>\n\n"
+            f"<b>Пример:</b>\n"
+            f"<code>/issue Пожалуйста, добавьте новую функцию с ...</code>\n\n"
+            if lang != "en" else
+            f"🛠 <b>SEND MESSAGE TO DEVELOPER</b>\n"
+            f"════════════════════\n\n"
+            f"To send a bug report or feature request, use:\n\n"
+            f"<code>/issue [your message]</code>\n\n"
+            f"<b>Example:</b>\n"
+            f"<code>/issue Please add a new feature with ...</code>\n\n"
+        )
+        await update.message.reply_text(text, parse_mode=ParseMode.HTML)
+        return
+    
+    # User provided issue text - forward to developer
+    issue_text = " ".join(args)
+    user = update.effective_user
+    
+    # Forward message to support if configured
     if SUPPORT_USERNAME:
-        text = (
-            f"🛠 Write to developer: @{SUPPORT_USERNAME}"
-            if lang == "en"
-            else f"🛠 Написать разработчику: @{SUPPORT_USERNAME}"
-        )
+        try:
+            forward_text = (
+                f"📩 <b>Новое обращение</b>\n"
+                f"════════════════════\n\n"
+                f"👤 От: {user.first_name} (@{user.username or 'нет_username'})\n"
+                f"🆔 User ID: <code>{user.id}</code>\n\n"
+                f"📝 Сообщение:\n<i>{issue_text}</i>"
+            )
+            await context.bot.send_message(
+                chat_id=SUPPORT_USERNAME if SUPPORT_USERNAME.isdigit() else None,
+                text=forward_text,
+                parse_mode=ParseMode.HTML
+            )
+            
+            # Confirm to user
+            confirm_text = (
+                f"✅ <b>Сообщение отправлено!</b>\n\n"
+                f"Разработчик получил ваше обращение и ответит вам в ближайшее время.\n\n"
+                f"Спасибо за обратную связь! 🙏"
+                if lang != "en" else
+                f"✅ <b>Message sent!</b>\n\n"
+                f"Developer received your message and will reply soon.\n\n"
+                f"Thank you for your feedback! 🙏"
+            )
+        except Exception as e:
+            print(f"Failed to forward issue: {e}")
+            confirm_text = (
+                f"⚠️ <b>Не удалось отправить сообщение</b>\n\n"
+                f"Напишите напрямую разработчику: @{SUPPORT_USERNAME}"
+                if lang != "en" else
+                f"⚠️ <b>Failed to send message</b>\n\n"
+                f"Please contact developer directly: @{SUPPORT_USERNAME}"
+            )
     else:
-        text = (
-            "🛠 Developer contact is not configured yet."
-            if lang == "en"
-            else "🛠 Контакт разработчика пока не настроен."
+        confirm_text = (
+            f"⚠️ Контакт разработчика пока не настроен."
+            if lang != "en" else
+            f"⚠️ Developer contact is not configured yet."
         )
-    await update.message.reply_text(text)
+    
+    await update.message.reply_text(confirm_text, parse_mode=ParseMode.HTML)
 
 
 async def language_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2491,18 +2565,23 @@ async def shop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "menu_shop":
         # Track navigation to shop
         push_nav_stack(context, "menu_shop")
+        current_gold = player_data.get('gold', 0)
         text = (
-            f"🛒 <b>SKIN SHOP</b>\n════════════════════\n\n"
-            f"Welcome to the shop! Here you can buy skins for cards and tables.\n\n"
-            f"🃏 Card Skins — customize your cards!\n"
-            f"🎰 Table Skins — change the table look!\n"
-            f"💰 Buy Chips — get more chips for the game!"
+            f"🛒 <b>SHOP</b>\n"
+            f"════════════════════\n\n"
+            f"🪙 Your Gold: <b>{current_gold}</b>\n\n"
+            f"🃏 <b>Card Skins</b> — customize your cards\n"
+            f"🎰 <b>Table Skins</b> — change table look\n"
+            f"🪙 <b>Chips</b> — buy chips with gold\n"
+            f"💎 <b>Buy Gold</b> — via Kaspi Pay"
             if lang == "en" else
-            f"🛒 <b>МАГАЗИН СКИНОВ</b>\n════════════════════\n\n"
-            f"Добро пожаловать в магазин! Здесь ты можешь купить скины для карт и столов.\n\n"
-            f"🃏 Скины карт — кастомизируй карты!\n"
-            f"🎰 Скины столов — меняй вид стола!\n"
-            f"💰 Купить фишки — получи больше фишек для игры!"
+            f"🛒 <b>МАГАЗИН</b>\n"
+            f"════════════════════\n\n"
+            f"🪙 Твоё Золото: <b>{current_gold}</b>\n\n"
+            f"🃏 <b>Скины карт</b> — кастомизируй карты\n"
+            f"🎰 <b>Скины столов</b> — меняй вид стола\n"
+            f"🪙 <b>Фишки</b> — купи фишки за золото\n"
+            f"💎 <b>Купить золото</b> — через Kaspi Pay"
         )
         # Create back button for shop if coming from another page
         back_button = InlineKeyboardButton("🔙 " + ("Back" if lang == "en" else "Назад"), callback_data="menu_back") if has_nav_history(context) else None
@@ -2547,26 +2626,124 @@ async def shop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "shop_category_chips":
         # Track navigation to chips
         push_nav_stack(context, "shop_category_chips")
-        # Show chips purchase options (not chip skins)
+        # Show chips purchase options with gold exchange
+        current_gold = player_data.get('gold', 0)
         text = (
-            f"💰 <b>BUY CHIPS</b>\n════════════════════\n\n"
-            f"Get more chips to play longer!\n\n"
-            f"📺 Watch ad — 3000 chips (FREE)\n"
-            f"🎁 More packages coming soon!"
+            f"🪙 <b>CHIPS PURCHASE</b>\n"
+            f"════════════════════\n\n"
+            f"Your Gold: <b>{current_gold}</b> 🪙\n\n"
+            f"Exchange rates:\n"
+            f"• 100 Gold → 1,000 chips\n"
+            f"• 200 Gold → 2,500 chips (+25% bonus)\n"
+            f"• 300 Gold → 4,000 chips (+33% bonus)\n"
+            f"• 500 Gold → 7,500 chips (+50% bonus)\n\n"
+            f"Select amount or watch ad for free chips:"
             if lang == "en" else
-            f"💰 <b>КУПИТЬ ФИШКИ</b>\n════════════════════\n\n"
-            f"Получи больше фишек, чтобы играть дольше!\n\n"
-            f"📺 Смотреть рекламу — 3000 фишек (БЕСПЛАТНО)\n"
-            f"🎁 Другие способы скоро появятся!"
+            f"🪙 <b>ПОКУПКА ФИШЕК</b>\n"
+            f"════════════════════\n\n"
+            f"Твоё Золото: <b>{current_gold}</b> 🪙\n\n"
+            f"Курсы обмена:\n"
+            f"• 100 Gold → 1,000 фишек\n"
+            f"• 200 Gold → 2,500 фишек (+25% бонус)\n"
+            f"• 300 Gold → 4,000 фишек (+33% бонус)\n"
+            f"• 500 Gold → 7,500 фишек (+50% бонус)\n\n"
+            f"Выбери сумму или посмотри рекламу:"
         )
         keyboard_buttons = [
-            [InlineKeyboardButton("📺 " + ("Watch Ad — 3000 chips" if lang == "en" else "Смотреть рекламу — 3000 фишек"), callback_data="chips_watch_ad")]
+            [InlineKeyboardButton("🪙 100 Gold → 1,000", callback_data="gold_exchange_100")],
+            [InlineKeyboardButton("🪙 200 Gold → 2,500", callback_data="gold_exchange_200")],
+            [InlineKeyboardButton("🪙 300 Gold → 4,000", callback_data="gold_exchange_300")],
+            [InlineKeyboardButton("🪙 500 Gold → 7,500", callback_data="gold_exchange_500")],
+            [InlineKeyboardButton("📺 " + ("Watch Ad — 3,000 chips (FREE)" if lang == "en" else "Смотреть рекламу — 3,000 фишек (БЕСПЛАТНО)"), callback_data="chips_watch_ad")],
         ]
         # Add back button using navigation system
         back_button = InlineKeyboardButton("🔙 " + ("Back" if lang == "en" else "Назад"), callback_data="menu_back")
         keyboard_buttons.append([back_button])
         keyboard = InlineKeyboardMarkup(keyboard_buttons)
         await safe_edit_message_text(query, text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
+        return
+
+    elif data == "shop_gold_buy":
+        # Track navigation
+        push_nav_stack(context, "shop_gold_buy")
+        # Show gold purchase via Kaspi
+        text = (
+            f"💎 <b>BUY GOLD — KASPI PAY</b>\n"
+            f"════════════════════\n\n"
+            f"Purchase gold via Kaspi Pay (Kazakhstan):\n\n"
+            f"💰 Payment: Kaspi transfer\n"
+            f"📱 To: +77012345678\n"
+            f"⚡ After approval: Gold instantly credited\n\n"
+            f"Select package:"
+            if lang == "en" else
+            f"💎 <b>ПОКУПКА ЗОЛОТА — KASPI PAY</b>\n"
+            f"════════════════════\n\n"
+            f"Купи золото через Kaspi Pay (Казахстан):\n\n"
+            f"💰 Оплата: перевод Kaspi\n"
+            f"📱 Получатель: +77012345678\n"
+            f"⚡ После одобрения: золото мгновенно\n\n"
+            f"Выбери пакет:"
+        )
+        from keyboards import get_kaspi_gold_packages_keyboard
+        await safe_edit_message_text(query, text, reply_markup=get_kaspi_gold_packages_keyboard(lang), parse_mode=ParseMode.HTML)
+        return
+
+    # Gold exchange handler
+    elif data.startswith("gold_exchange_"):
+        exchange_id = data
+        from keyboards import GOLD_EXCHANGE_RATES
+        
+        if exchange_id not in GOLD_EXCHANGE_RATES:
+            await query.answer("❌ Invalid exchange option" if lang == "en" else "❌ Неверный вариант обмена", show_alert=True)
+            return
+        
+        rate = GOLD_EXCHANGE_RATES[exchange_id]
+        gold_cost = rate["gold_cost"]
+        chips_amount = rate["chips"]
+        
+        current_gold = player_data.get('gold', 0)
+        
+        if current_gold < gold_cost:
+            await query.answer(
+                f"❌ You don't have enough gold to buy\n\n"
+                f"Required: {gold_cost} 🪙\n"
+                f"You have: {current_gold} 🪙\n\n"
+                f"Buy gold in the shop! 💎"
+                if lang == "en" else
+                f"❌ У вас не хватает золота для покупки\n\n"
+                f"Нужно: {gold_cost} 🪙\n"
+                f"У вас: {current_gold} 🪙\n\n"
+                f"Купите золото в магазине! 💎",
+                show_alert=True
+            )
+            return
+        
+        # Perform exchange: deduct gold, add chips
+        from database import add_gold, add_coins
+        await add_gold(user.id, -gold_cost)
+        await add_coins(user.id, chips_amount)
+        
+        success_text = (
+            f"✅ <b>Exchange successful!</b>\n\n"
+            f"Spent: <b>{gold_cost}</b> 🪙\n"
+            f"Received: <b>{chips_amount:,}</b> 💰\n\n"
+            f"Happy gaming!"
+            if lang == "en" else
+            f"✅ <b>Обмен успешен!</b>\n\n"
+            f"Потрачено: <b>{gold_cost}</b> 🪙\n"
+            f"Получено: <b>{chips_amount:,}</b> 💰\n\n"
+            f"Удачи в игре!"
+        )
+        
+        await context.bot.send_message(
+            chat_id=user.id,
+            text=success_text,
+            parse_mode=ParseMode.HTML
+        )
+        await query.answer(
+            f"✅ +{chips_amount:,} chips!" if lang == "en" else f"✅ +{chips_amount:,} фишек!",
+            show_alert=True
+        )
         return
 
     # Card skin buy/equip

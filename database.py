@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Optional, Dict, List
 
 from config import ADMIN_IDS
-from skins import SKINS, TABLE_SKINS, CHIP_SKINS
+from skins import SKINS, TABLE_SKINS
 
 DB_NAME = "poker_stats.db"
 
@@ -39,8 +39,6 @@ async def init_db():
             ("luck_multiplier", "INTEGER DEFAULT 0"), 
             ("table_skin", "TEXT DEFAULT 'classic'"), 
             ("owned_table_skins", "TEXT DEFAULT '[\"classic\"]'"),
-            ("chip_skin", "TEXT DEFAULT 'classic'"),
-            ("owned_chip_skins", "TEXT DEFAULT '[\"classic\"]'"),
         ]:
             try:
                 await db.execute(f"ALTER TABLE players ADD COLUMN {col} {definition}")
@@ -106,24 +104,19 @@ async def get_player(user_id: int, username: str = "", first_name: str = "") -> 
             if is_admin:
                 all_card_skins = list(SKINS.keys())
                 all_table_skins = list(TABLE_SKINS.keys())
-                all_chip_skins = list(CHIP_SKINS.keys())
                 owned_skins_json = json.dumps(all_card_skins)
                 owned_table_skins_json = json.dumps(all_table_skins)
-                owned_chip_skins_json = json.dumps(all_chip_skins)
                 card_skin = "classic"  # Default active
                 table_skin = "classic"  # Default active
-                chip_skin = "classic"  # Default active
             else:
                 owned_skins_json = '["classic"]'
                 owned_table_skins_json = '["classic"]'
-                owned_chip_skins_json = '["classic"]'
                 card_skin = "classic"
                 table_skin = "classic"
-                chip_skin = "classic"
             
             await db.execute(
-                "INSERT INTO players (user_id, username, first_name, card_skin, table_skin, chip_skin, owned_skins, owned_table_skins, owned_chip_skins) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (user_id, username, first_name, card_skin, table_skin, chip_skin, owned_skins_json, owned_table_skins_json, owned_chip_skins_json)
+                "INSERT INTO players (user_id, username, first_name, card_skin, table_skin, owned_skins, owned_table_skins) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (user_id, username, first_name, card_skin, table_skin, owned_skins_json, owned_table_skins_json)
             )
             await db.commit()
             
@@ -131,8 +124,8 @@ async def get_player(user_id: int, username: str = "", first_name: str = "") -> 
                 "user_id": user_id, "username": username, "first_name": first_name,
                 "games_played": 0, "games_won": 0, "total_winnings": 0,
                 "biggest_win": 0, "current_balance": 1000,
-                "gold": 0, "card_skin": card_skin, "table_skin": table_skin, "chip_skin": chip_skin,
-                "owned_skins": owned_skins_json, "owned_table_skins": owned_table_skins_json, "owned_chip_skins": owned_chip_skins_json,
+                "gold": 0, "card_skin": card_skin, "table_skin": table_skin,
+                "owned_skins": owned_skins_json, "owned_table_skins": owned_table_skins_json,
                 "language": "ru", "luck_multiplier": 0
             }
             
@@ -153,31 +146,24 @@ async def get_player(user_id: int, username: str = "", first_name: str = "") -> 
             # Ensure admin has all skins
             all_card_skins = list(SKINS.keys())
             all_table_skins = list(TABLE_SKINS.keys())
-            all_chip_skins = list(CHIP_SKINS.keys())
             owned_skins_json = json.dumps(all_card_skins)
             owned_table_skins_json = json.dumps(all_table_skins)
-            owned_chip_skins_json = json.dumps(all_chip_skins)
             
             current_owned = json.loads(row['owned_skins'] or '["classic"]')
             current_table_owned = json.loads(row['owned_table_skins'] or '["classic"]')
-            # Convert row to dict to use .get() method for potentially missing column
-            row_dict = dict(row)
-            current_chip_owned = json.loads(row_dict.get('owned_chip_skins', None) or '["classic"]')
             
             # If admin doesn't have all skins, grant them
             if (set(current_owned) != set(all_card_skins) or 
-                set(current_table_owned) != set(all_table_skins) or
-                set(current_chip_owned) != set(all_chip_skins)):
+                set(current_table_owned) != set(all_table_skins)):
                 await db.execute(
-                    "UPDATE players SET owned_skins = ?, owned_table_skins = ?, owned_chip_skins = ? WHERE user_id = ?",
-                    (owned_skins_json, owned_table_skins_json, owned_chip_skins_json, user_id)
+                    "UPDATE players SET owned_skins = ?, owned_table_skins = ? WHERE user_id = ?",
+                    (owned_skins_json, owned_table_skins_json, user_id)
                 )
                 await db.commit()
                 # Update row data
                 row = dict(row)
                 row['owned_skins'] = owned_skins_json
                 row['owned_table_skins'] = owned_table_skins_json
-                row['owned_chip_skins'] = owned_chip_skins_json
                 return row
         
         # Обновляем имя, если оно изменилось
@@ -303,33 +289,6 @@ async def set_table_skin(user_id: int, skin_id: str):
         await db.commit()
 
 
-async def buy_chip_skin(user_id: int, skin_id: str, price: int) -> bool:
-    """Купить скин фишек за золото. Возвращает True если успешно."""
-    async with aiosqlite.connect(DB_NAME) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute("SELECT gold, owned_chip_skins FROM players WHERE user_id = ?", (user_id,)) as cursor:
-            row = await cursor.fetchone()
-        if not row or row["gold"] < price:
-            return False
-        owned = json.loads(row["owned_chip_skins"] or '["classic"]')
-        if skin_id in owned:
-            return False
-        owned.append(skin_id)
-        await db.execute(
-            "UPDATE players SET gold = gold - ?, owned_chip_skins = ?, chip_skin = ? WHERE user_id = ?",
-            (price, json.dumps(owned), skin_id, user_id)
-        )
-        await db.commit()
-        return True
-
-
-async def set_chip_skin(user_id: int, skin_id: str):
-    """Установить активный скин фишек"""
-    async with aiosqlite.connect(DB_NAME) as db:
-        await db.execute("UPDATE players SET chip_skin = ? WHERE user_id = ?", (skin_id, user_id))
-        await db.commit()
-
-
 async def set_skin(user_id: int, skin_id: str):
     """Установить активный скин"""
     async with aiosqlite.connect(DB_NAME) as db:
@@ -361,19 +320,17 @@ async def get_leaderboard(limit: int = 10) -> List[Dict]:
 # ==================== KASPI PAYMENTS ====================
 
 KASPI_PRICES = {
-    # Фишки
-    "chips_10k": {"amount": 10000, "price_kzt": 500, "name": "10 000 фишек"},
-    "chips_50k": {"amount": 50000, "price_kzt": 2000, "name": "50 000 фишек"},
-    "chips_100k": {"amount": 100000, "price_kzt": 3500, "name": "100 000 фишек"},
-    "chips_500k": {"amount": 500000, "price_kzt": 15000, "name": "500 000 фишек"},
-    # Gold
-    "gold_100": {"amount": 100, "price_kzt": 300, "name": "100 Gold"},
-    "gold_500": {"amount": 500, "price_kzt": 1200, "name": "500 Gold"},
-    "gold_1000": {"amount": 1000, "price_kzt": 2000, "name": "1000 Gold"},
-    "gold_5000": {"amount": 5000, "price_kzt": 8500, "name": "5000 Gold"},
-    # Скины (цена за скин)
-    "skin_premium": {"amount": 1, "price_kzt": 2000, "name": "Premium скин карт"},
-    "table_premium": {"amount": 1, "price_kzt": 3000, "name": "Premium скин стола"},
+    # Gold packages - основная валюта для покупки через Kaspi
+    "gold_100": {"amount": 100, "price_kzt": 100, "name": "100 Gold"},
+    "gold_200": {"amount": 200, "price_kzt": 150, "name": "200 Gold"},
+    "gold_300": {"amount": 300, "price_kzt": 200, "name": "300 Gold"},
+    "gold_500": {"amount": 500, "price_kzt": 300, "name": "500 Gold (экономия 100₸)"},
+    "gold_1000": {"amount": 1000, "price_kzt": 550, "name": "1000 Gold (экономия 450₸)"},
+    "gold_2000": {"amount": 2000, "price_kzt": 1000, "name": "2000 Gold (экономия 1000₸)"},
+    # Фишки через Kaspi (альтернативный способ)
+    "chips_10k": {"amount": 10000, "price_kzt": 100, "name": "10 000 фишек"},
+    "chips_25k": {"amount": 25000, "price_kzt": 150, "name": "25 000 фишек"},
+    "chips_50k": {"amount": 50000, "price_kzt": 250, "name": "50 000 фишек"},
 }
 
 async def create_kaspi_payment(user_id: int, username: str, first_name: str, 

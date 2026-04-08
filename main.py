@@ -116,7 +116,7 @@ def main():
 
     # Kaspi Pay handlers
     application.add_handler(CallbackQueryHandler(kaspi_callback, pattern="^kaspi_"))
-    application.add_handler(CallbackQueryHandler(admin_kaspi_callback, pattern="^admin_kaspi_|^admin_approve_|^admin_reject_"))
+    application.add_handler(CallbackQueryHandler(admin_kaspi_callback, pattern="^admin_kaspi_|^admin_approve_|^admin_reject_|^admin_view_payment_|^admin_approve_comment_"))
     
     # Фото чеков Kaspi (высший приоритет в группе фото)
     application.add_handler(MessageHandler(

@@ -1,18 +1,24 @@
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import ContextTypes
+from telegram.constants import ParseMode
+from handlers import _user_lang
+from keyboards import get_admin_kaspi_panel_keyboard, get_admin_payment_action_keyboard, get_admin_payment_view_keyboard
 
 # ==================== KASPI PAY HANDLERS ====================
 
-# Kaspi payment prices mapping
+# Kaspi payment prices mapping - GOLD ONLY (chips are bought with gold)
 KASPI_PRICES = {
-    # Фишки
-    "chips_10k": {"amount": 10000, "price_kzt": 500, "name": "10 000 фишек"},
-    "chips_50k": {"amount": 50000, "price_kzt": 2000, "name": "50 000 фишек"},
-    "chips_100k": {"amount": 100000, "price_kzt": 3500, "name": "100 000 фишек"},
-    "chips_500k": {"amount": 500000, "price_kzt": 15000, "name": "500 000 фишек"},
-    # Gold
-    "gold_100": {"amount": 100, "price_kzt": 300, "name": "100 Gold"},
-    "gold_500": {"amount": 500, "price_kzt": 1200, "name": "500 Gold"},
-    "gold_1000": {"amount": 1000, "price_kzt": 2000, "name": "1000 Gold"},
-    "gold_5000": {"amount": 5000, "price_kzt": 8500, "name": "5000 Gold"},
+    # Gold packages - по запросу пользователя
+    "gold_100": {"amount": 100, "price_kzt": 100, "name": "100 Gold"},
+    "gold_200": {"amount": 200, "price_kzt": 150, "name": "200 Gold"},
+    "gold_300": {"amount": 300, "price_kzt": 200, "name": "300 Gold"},
+    "gold_500": {"amount": 500, "price_kzt": 300, "name": "500 Gold (экономия 100₸)"},
+    "gold_1000": {"amount": 1000, "price_kzt": 550, "name": "1000 Gold (экономия 450₸)"},
+    "gold_2000": {"amount": 2000, "price_kzt": 1000, "name": "2000 Gold (экономия 1000₸)"},
+    # Фишки через Kaspi (альтернативный способ)
+    "chips_10k": {"amount": 10000, "price_kzt": 100, "name": "10 000 фишек"},
+    "chips_25k": {"amount": 25000, "price_kzt": 150, "name": "25 000 фишек"},
+    "chips_50k": {"amount": 50000, "price_kzt": 250, "name": "50 000 фишек"},
 }
 
 # User state for pending receipt uploads
@@ -28,16 +34,19 @@ async def kaspi_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_en = lang == "en"
     data = query.data
 
-    # Map callback data to item info
+    # Map callback data to item info (item_type, item_id, amount_item, amount_kzt)
     item_map = {
-        "kaspi_chips_10k": ("chips", "chips_10k", 10000, 500),
-        "kaspi_chips_50k": ("chips", "chips_50k", 50000, 2000),
-        "kaspi_chips_100k": ("chips", "chips_100k", 100000, 3500),
-        "kaspi_chips_500k": ("chips", "chips_500k", 500000, 15000),
-        "kaspi_gold_100": ("gold", "gold_100", 100, 300),
-        "kaspi_gold_500": ("gold", "gold_500", 500, 1200),
-        "kaspi_gold_1000": ("gold", "gold_1000", 1000, 2000),
-        "kaspi_gold_5000": ("gold", "gold_5000", 5000, 8500),
+        # Gold packages
+        "kaspi_gold_100": ("gold", "gold_100", 100, 100),
+        "kaspi_gold_200": ("gold", "gold_200", 200, 150),
+        "kaspi_gold_300": ("gold", "gold_300", 300, 200),
+        "kaspi_gold_500": ("gold", "gold_500", 500, 300),
+        "kaspi_gold_1000": ("gold", "gold_1000", 1000, 550),
+        "kaspi_gold_2000": ("gold", "gold_2000", 2000, 1000),
+        # Chips via Kaspi (direct)
+        "kaspi_chips_10k": ("chips", "chips_10k", 10000, 100),
+        "kaspi_chips_25k": ("chips", "chips_25k", 25000, 150),
+        "kaspi_chips_50k": ("chips", "chips_50k", 50000, 250),
     }
 
     # Handle menu navigation
@@ -149,8 +158,7 @@ async def kaspi_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode=ParseMode.HTML
         )
         
-        # Notify admins about new payment
-        await notify_admins_new_payment(context, payment_id, user, item_name, amount_kzt)
+        # Admin will be notified only after user uploads receipt
         
     elif data.startswith("kaspi_upload_"):
         payment_id = int(data.replace("kaspi_upload_", ""))
@@ -244,8 +252,8 @@ async def kaspi_receipt_photo_handler(update: Update, context: ContextTypes.DEFA
     # Remove from pending uploads
     del kaspi_pending_receipts[user.id]
     
-    # Notify admins about receipt
-    await notify_admins_receipt_received(context, payment_id, user, file_id)
+    # Notify admins about receipt with full payment details
+    await notify_admins_receipt_received(context, payment_id, user, file_id, payment)
 
 
 async def notify_admins_new_payment(context: ContextTypes.DEFAULT_TYPE, payment_id: int, 
@@ -275,31 +283,52 @@ async def notify_admins_new_payment(context: ContextTypes.DEFAULT_TYPE, payment_
 
 
 async def notify_admins_receipt_received(context: ContextTypes.DEFAULT_TYPE, payment_id: int,
-                                        user, receipt_file_id: str):
-    """Notify admins that user uploaded receipt."""
+                                        user, receipt_file_id: str, payment: dict):
+    """Notify admins that user uploaded receipt with full payment details."""
     from config import ADMIN_IDS
-    from keyboards import get_admin_payment_action_keyboard
+    from keyboards import get_admin_payment_view_keyboard
+    
+    item_name = KASPI_PRICES.get(payment['item_id'], {}).get("name", payment['item_id'])
     
     text = (
-        f"📤 <b>ПОЛУЧЕН ЧЕК!</b>\n\n"
-        f"Заявка: <code>#{payment_id}</code>\n"
-        f"Пользователь: {user.first_name}\n"
-        f"User ID: <code>{user.id}</code>\n\n"
-        f"✅ Требуется проверка!"
+        f"🔔 <b>НОВАЯ ЗАЯВКА КАСПИ</b>\n"
+        f"════════════════════\n\n"
+        f"📋 <b>Номер заявки:</b> <code>#{payment_id}</code>\n"
+        f"👤 <b>Пользователь:</b> {user.first_name}\n"
+        f"🆔 <b>User ID:</b> <code>{user.id}</code>\n"
+        f"📱 <b>Telegram:</b> @{user.username or 'нет_username'}\n\n"
+        f"📦 <b>Товар:</b> {item_name}\n"
+        f"💰 <b>Сумма к оплате:</b> {payment['amount_kzt']} ₸\n\n"
+        f"✅ Требуется проверка!\n"
+        f"📎 Чек будет показан при просмотре заявки"
     )
+    
+    # Store message IDs for deletion later and receipt file_id
+    if 'admin_payment_notifications' not in context.bot_data:
+        context.bot_data['admin_payment_notifications'] = {}
+    if 'payment_receipts' not in context.bot_data:
+        context.bot_data['payment_receipts'] = {}
+    
+    # Store receipt file_id for later use
+    context.bot_data['payment_receipts'][payment_id] = receipt_file_id
     
     for admin_id in ADMIN_IDS:
         try:
-            # Send receipt photo
-            await context.bot.send_photo(
+            # Send notification only (without receipt photo)
+            msg = await context.bot.send_message(
                 admin_id,
-                photo=receipt_file_id,
-                caption=text,
-                reply_markup=get_admin_payment_action_keyboard(payment_id),
+                text,
+                reply_markup=get_admin_payment_view_keyboard(payment_id),
                 parse_mode=ParseMode.HTML
             )
+            # Store message ID for this admin
+            if payment_id not in context.bot_data['admin_payment_notifications']:
+                context.bot_data['admin_payment_notifications'][payment_id] = {}
+            context.bot_data['admin_payment_notifications'][payment_id][admin_id] = {
+                'message_id': msg.message_id
+            }
         except Exception as e:
-            print(f"Failed to send receipt to admin {admin_id}: {e}")
+            print(f"Failed to notify admin {admin_id}: {e}")
 
 
 async def admin_kaspi_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -318,8 +347,9 @@ async def admin_kaspi_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     is_en = lang == "en"
     
     if data == "admin_kaspi_pending":
-        # Show pending payments
+        # Show pending payments list
         from database import get_pending_payments
+        from keyboards import get_admin_pending_list_keyboard
         pending = await get_pending_payments()
         
         if not pending:
@@ -329,9 +359,24 @@ async def admin_kaspi_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             )
             return
         
-        # Show first pending payment
-        payment = pending[0]
-        await show_payment_to_admin(query, payment, lang)
+        # Show list of pending payments as buttons
+        text = (
+            f"📋 <b>ОЖИДАЮЩИЕ ЗАЯВКИ</b>\n"
+            f"════════════════════\n\n"
+            f"Всего: <b>{len(pending)}</b>\n\n"
+            f"Выберите заявку для просмотра:"
+            if not is_en else
+            f"📋 <b>PENDING PAYMENTS</b>\n"
+            f"════════════════════\n\n"
+            f"Total: <b>{len(pending)}</b>\n\n"
+            f"Select a payment to view:"
+        )
+        
+        await query.edit_message_text(
+            text,
+            reply_markup=get_admin_pending_list_keyboard(pending, lang),
+            parse_mode=ParseMode.HTML
+        )
         
     elif data == "admin_kaspi_stats":
         # Show payment statistics
@@ -362,6 +407,35 @@ async def admin_kaspi_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             parse_mode=ParseMode.HTML
         )
         
+    elif data.startswith("admin_view_payment_"):
+        payment_id = int(data.replace("admin_view_payment_", ""))
+        admin_id = user.id
+        
+        # Delete original notification messages for this admin
+        notifications = context.bot_data.get('admin_payment_notifications', {})
+        if payment_id in notifications and admin_id in notifications[payment_id]:
+            msg_ids = notifications[payment_id][admin_id]
+            try:
+                # Delete main notification
+                await context.bot.delete_message(admin_id, msg_ids['message_id'])
+            except Exception as e:
+                print(f"Failed to delete notification: {e}")
+            try:
+                # Delete receipt photo
+                await context.bot.delete_message(admin_id, msg_ids['photo_message_id'])
+            except Exception as e:
+                print(f"Failed to delete receipt photo: {e}")
+            # Clean up
+            del context.bot_data['admin_payment_notifications'][payment_id][admin_id]
+        
+        from database import get_kaspi_payment
+        payment = await get_kaspi_payment(payment_id)
+        if payment:
+            # Send new message with payment details instead of editing
+            await send_payment_details_to_admin(context, admin_id, payment, lang)
+        else:
+            await query.answer("❌ Заявка не найдена", show_alert=True)
+        
     elif data.startswith("admin_approve_"):
         payment_id = int(data.replace("admin_approve_", ""))
         await process_payment_approval(update, context, payment_id, "", lang)
@@ -382,7 +456,7 @@ async def admin_kaspi_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.edit_message_text(text, parse_mode=ParseMode.HTML)
         
     elif data.startswith("admin_approve_comment_"):
-        payment_id = int(data.replace("admin_approve_comment_", ""))
+        payment_id = int(data.split("_")[-1])
         context.user_data['approving_payment'] = payment_id
         
         text = (
@@ -419,19 +493,69 @@ async def show_payment_to_admin(query, payment: dict, lang: str):
         f"🕐 Создано: {payment['created_at'][:16] if payment['created_at'] else '—'}"
     )
     
-    if payment.get('receipt_photo_id'):
-        # Show receipt photo with details
-        await query.edit_message_caption(
-            caption=text,
-            reply_markup=get_admin_payment_action_keyboard(payment['id'], lang),
-            parse_mode=ParseMode.HTML
-        )
-    else:
-        await query.edit_message_text(
-            text,
-            reply_markup=get_admin_payment_action_keyboard(payment['id'], lang),
-            parse_mode=ParseMode.HTML
-        )
+    # Always use edit_message_text to avoid caption errors
+    await query.edit_message_text(
+        text,
+        reply_markup=get_admin_payment_action_keyboard(payment['id'], lang),
+        parse_mode=ParseMode.HTML
+    )
+    
+    # Store message ID for later deletion
+    if 'payment_messages' not in context.user_data:
+        context.user_data['payment_messages'] = {}
+    context.user_data['payment_messages'][payment['id']] = query.message.message_id
+
+
+async def send_payment_details_to_admin(context: ContextTypes.DEFAULT_TYPE, admin_id: int, 
+                                           payment: dict, lang: str):
+    """Send payment details and receipt photo to admin."""
+    from keyboards import get_admin_payment_action_keyboard
+    
+    status_map = {
+        "pending": "⏳ Ожидает",
+        "approved": "✅ Одобрено",
+        "rejected": "❌ Отклонено"
+    }
+    
+    text = (
+        f"📋 <b>ЗАЯВКА #{payment['id']}</b>\n"
+        f"════════════════════\n\n"
+        f"👤 Пользователь: {payment['first_name']}\n"
+        f"🆔 User ID: <code>{payment['user_id']}</code>\n"
+        f"📦 Товар: <b>{payment['item_type']}</b>\n"
+        f"🆔 Item ID: {payment['item_id']}\n"
+        f"💰 Сумма: <b>{payment['amount_kzt']} ₸</b>\n"
+        f"📊 Количество: <b>{payment['amount_item']}</b>\n"
+        f"⏱ Статус: <b>{status_map.get(payment['status'], payment['status'])}</b>\n"
+        f"🕐 Создано: {payment['created_at'][:16] if payment['created_at'] else '—'}"
+    )
+    
+    # Get receipt file_id if available
+    receipt_file_id = context.bot_data.get('payment_receipts', {}).get(payment['id'])
+    
+    # Send receipt photo first if available
+    if receipt_file_id:
+        try:
+            await context.bot.send_photo(
+                admin_id,
+                photo=receipt_file_id,
+                caption=f"📄 Чек к заявке #{payment['id']}"
+            )
+        except Exception as e:
+            print(f"Failed to send receipt photo: {e}")
+    
+    # Send new message with payment details
+    msg = await context.bot.send_message(
+        admin_id,
+        text,
+        reply_markup=get_admin_payment_action_keyboard(payment['id'], lang),
+        parse_mode=ParseMode.HTML
+    )
+    
+    # Store message ID for later deletion
+    if 'payment_messages' not in context.user_data:
+        context.user_data['payment_messages'] = {}
+    context.user_data['payment_messages'][payment['id']] = msg.message_id
 
 
 async def process_payment_approval(update: Update, context: ContextTypes.DEFAULT_TYPE, 
@@ -470,12 +594,38 @@ async def process_payment_approval(update: Update, context: ContextTypes.DEFAULT
     except Exception as e:
         print(f"Failed to notify user {user_id}: {e}")
     
-    # Show next pending or stats
+    # Delete the payment message if tracked
+    payment_messages = context.user_data.get('payment_messages', {})
+    if payment_id in payment_messages:
+        try:
+            await context.bot.delete_message(
+                chat_id=update.effective_chat.id,
+                message_id=payment_messages[payment_id]
+            )
+            del context.user_data['payment_messages'][payment_id]
+        except Exception as e:
+            print(f"Failed to delete payment message: {e}")
+    
+    # Show confirmation and return to pending list
     from database import get_pending_payments
     pending = await get_pending_payments()
     
     if pending:
-        await show_payment_to_admin(update.callback_query, pending[0], lang)
+        text = (
+            f"✅ <b>Заявка #{payment_id} одобрена!</b>\n\n"
+            f"📋 Осталось заявок: <b>{len(pending)}</b>\n\n"
+            f"Выберите следующую заявку:"
+            if lang != "en" else
+            f"✅ <b>Payment #{payment_id} approved!</b>\n\n"
+            f"📋 Pending: <b>{len(pending)}</b>\n\n"
+            f"Select next payment:"
+        )
+        from keyboards import get_admin_pending_list_keyboard
+        await update.effective_message.reply_text(
+            text,
+            reply_markup=get_admin_pending_list_keyboard(pending, lang),
+            parse_mode=ParseMode.HTML
+        )
     else:
         await update.effective_message.reply_text(
             "✅ Все заявки обработаны!" if lang != "en" else "✅ All payments processed!",
@@ -518,10 +668,43 @@ async def process_payment_rejection(update: Update, context: ContextTypes.DEFAUL
     except Exception as e:
         print(f"Failed to notify user {user_id}: {e}")
     
-    await update.message.reply_text(
-        f"✅ Заявка #{payment_id} отклонена" if lang != "en" else f"✅ Payment #{payment_id} rejected",
-        reply_markup=get_admin_kaspi_panel_keyboard(lang)
-    )
+    # Delete the payment message if tracked
+    payment_messages = context.user_data.get('payment_messages', {})
+    if payment_id in payment_messages:
+        try:
+            await context.bot.delete_message(
+                chat_id=update.effective_chat.id,
+                message_id=payment_messages[payment_id]
+            )
+            del context.user_data['payment_messages'][payment_id]
+        except Exception as e:
+            print(f"Failed to delete payment message: {e}")
+    
+    # Show confirmation and return to pending list
+    from database import get_pending_payments
+    pending = await get_pending_payments()
+    
+    if pending:
+        text = (
+            f"❌ <b>Заявка #{payment_id} отклонена!</b>\n\n"
+            f"📋 Осталось заявок: <b>{len(pending)}</b>\n\n"
+            f"Выберите следующую заявку:"
+            if lang != "en" else
+            f"❌ <b>Payment #{payment_id} rejected!</b>\n\n"
+            f"📋 Pending: <b>{len(pending)}</b>\n\n"
+            f"Select next payment:"
+        )
+        from keyboards import get_admin_pending_list_keyboard
+        await update.message.reply_text(
+            text,
+            reply_markup=get_admin_pending_list_keyboard(pending, lang),
+            parse_mode=ParseMode.HTML
+        )
+    else:
+        await update.message.reply_text(
+            "✅ Все заявки обработаны!" if lang != "en" else "✅ All payments processed!",
+            reply_markup=get_admin_kaspi_panel_keyboard(lang)
+        )
 
 
 async def admin_kaspi_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):

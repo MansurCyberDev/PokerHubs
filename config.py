@@ -4,7 +4,7 @@ import os
 TOKEN = os.getenv("POKER_BOT_TOKEN", "8633427504:AAG-vnFD5raHl1WOxjtBXTKQ_YJTsqYUzDY")
 
 # Вставь сюда свой ID (или несколько через запятую) для админ-прав
-ADMIN_IDS = [5491969475, 1103249736]
+ADMIN_IDS = [5491969475]
 SUPPORT_USERNAME = os.getenv("POKER_SUPPORT_USERNAME", "")
 
 # Настройки игры
