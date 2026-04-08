@@ -533,14 +533,16 @@ async def send_payment_details_to_admin(context: ContextTypes.DEFAULT_TYPE, admi
     # Get receipt file_id if available
     receipt_file_id = context.bot_data.get('payment_receipts', {}).get(payment['id'])
     
-    # Send receipt photo first if available
+    # Send receipt photo first if available and track its message ID
+    photo_message_id = None
     if receipt_file_id:
         try:
-            await context.bot.send_photo(
+            photo_msg = await context.bot.send_photo(
                 admin_id,
                 photo=receipt_file_id,
                 caption=f"📄 Чек к заявке #{payment['id']}"
             )
+            photo_message_id = photo_msg.message_id
         except Exception as e:
             print(f"Failed to send receipt photo: {e}")
     
@@ -552,10 +554,13 @@ async def send_payment_details_to_admin(context: ContextTypes.DEFAULT_TYPE, admi
         parse_mode=ParseMode.HTML
     )
     
-    # Store message ID for later deletion
+    # Store message IDs for later deletion
     if 'payment_messages' not in context.user_data:
         context.user_data['payment_messages'] = {}
-    context.user_data['payment_messages'][payment['id']] = msg.message_id
+    context.user_data['payment_messages'][payment['id']] = {
+        'message_id': msg.message_id,
+        'photo_message_id': photo_message_id
+    }
 
 
 async def process_payment_approval(update: Update, context: ContextTypes.DEFAULT_TYPE, 
@@ -594,17 +599,29 @@ async def process_payment_approval(update: Update, context: ContextTypes.DEFAULT
     except Exception as e:
         print(f"Failed to notify user {user_id}: {e}")
     
-    # Delete the payment message if tracked
+    # Delete the payment message and receipt photo if tracked
     payment_messages = context.user_data.get('payment_messages', {})
     if payment_id in payment_messages:
+        msg_data = payment_messages[payment_id]
+        chat_id = update.effective_chat.id
+        # Delete main payment message
         try:
             await context.bot.delete_message(
-                chat_id=update.effective_chat.id,
-                message_id=payment_messages[payment_id]
+                chat_id=chat_id,
+                message_id=msg_data['message_id']
             )
-            del context.user_data['payment_messages'][payment_id]
         except Exception as e:
             print(f"Failed to delete payment message: {e}")
+        # Delete receipt photo if exists
+        if msg_data.get('photo_message_id'):
+            try:
+                await context.bot.delete_message(
+                    chat_id=chat_id,
+                    message_id=msg_data['photo_message_id']
+                )
+            except Exception as e:
+                print(f"Failed to delete receipt photo: {e}")
+        del context.user_data['payment_messages'][payment_id]
     
     # Show confirmation and return to pending list
     from database import get_pending_payments
@@ -668,17 +685,29 @@ async def process_payment_rejection(update: Update, context: ContextTypes.DEFAUL
     except Exception as e:
         print(f"Failed to notify user {user_id}: {e}")
     
-    # Delete the payment message if tracked
+    # Delete the payment message and receipt photo if tracked
     payment_messages = context.user_data.get('payment_messages', {})
     if payment_id in payment_messages:
+        msg_data = payment_messages[payment_id]
+        chat_id = update.effective_chat.id
+        # Delete main payment message
         try:
             await context.bot.delete_message(
-                chat_id=update.effective_chat.id,
-                message_id=payment_messages[payment_id]
+                chat_id=chat_id,
+                message_id=msg_data['message_id']
             )
-            del context.user_data['payment_messages'][payment_id]
         except Exception as e:
             print(f"Failed to delete payment message: {e}")
+        # Delete receipt photo if exists
+        if msg_data.get('photo_message_id'):
+            try:
+                await context.bot.delete_message(
+                    chat_id=chat_id,
+                    message_id=msg_data['photo_message_id']
+                )
+            except Exception as e:
+                print(f"Failed to delete receipt photo: {e}")
+        del context.user_data['payment_messages'][payment_id]
     
     # Show confirmation and return to pending list
     from database import get_pending_payments
