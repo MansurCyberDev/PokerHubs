@@ -423,6 +423,18 @@ async def safe_edit_message_text(query, text: str, reply_markup=None, parse_mode
     except BadRequest as e:
         if "Message is not modified" in str(e):
             return None
+        # Handle video/photo messages that have caption instead of text
+        if "no text in the message" in str(e).lower() or "no caption in the message" in str(e).lower():
+            try:
+                return await query.edit_message_caption(
+                    caption=text,
+                    reply_markup=reply_markup,
+                    parse_mode=parse_mode
+                )
+            except BadRequest as e2:
+                if "Message is not modified" in str(e2):
+                    return None
+                raise
         raise
 
 
@@ -2952,12 +2964,17 @@ async def chips_ad_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     lang = await _user_lang(user.id)
     
+    # Answer callback immediately to prevent timeout
+    try:
+        await query.answer()
+    except Exception as e:
+        print(f"Failed to answer callback: {e}")
+    
     if query.data == "chips_watch_ad":
         # Send the rewarded video
         # VIDEO PLACEMENT: Put your ad video file at: /Users/mansur/Desktop/PokerHubs/assets/ad_video.mp4
         try:
             print(f"DEBUG chips_ad_callback: User {user.id} triggered watch ad")
-            # Don't answer query immediately - will answer after video is sent
             
             # Check rate limiting
             allowed, remaining = await _check_ad_rate_limit(user.id)
