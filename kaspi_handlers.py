@@ -668,6 +668,8 @@ async def process_payment_rejection(update: Update, context: ContextTypes.DEFAUL
     payment = await get_kaspi_payment(payment_id)
     user_id = payment['user_id']
     
+    # Notify user about rejection
+    user_notified = False
     try:
         text = (
             f"❌ <b>ПЛАТЕЖ ОТКЛОНЕН</b>\n\n"
@@ -682,8 +684,12 @@ async def process_payment_rejection(update: Update, context: ContextTypes.DEFAUL
         )
         
         await context.bot.send_message(user_id, text, parse_mode=ParseMode.HTML)
+        user_notified = True
+        print(f"✅ User {user_id} notified about rejection of payment #{payment_id}")
     except Exception as e:
-        print(f"Failed to notify user {user_id}: {e}")
+        print(f"❌ Failed to notify user {user_id} about rejection: {e}")
+        import traceback
+        traceback.print_exc()
     
     # Delete the payment message and receipt photo if tracked
     payment_messages = context.user_data.get('payment_messages', {})
@@ -714,12 +720,21 @@ async def process_payment_rejection(update: Update, context: ContextTypes.DEFAUL
     pending = await get_pending_payments()
     
     if pending:
+        # Build confirmation message with user notification status
+        user_notification_status = (
+            "✅ Пользователь уведомлен" if user_notified else "⚠️ Не удалось уведомить пользователя"
+        ) if lang != "en" else (
+            "✅ User notified" if user_notified else "⚠️ Failed to notify user"
+        )
+        
         text = (
-            f"❌ <b>Заявка #{payment_id} отклонена!</b>\n\n"
+            f"❌ <b>Заявка #{payment_id} отклонена!</b>\n"
+            f"{user_notification_status}\n\n"
             f"📋 Осталось заявок: <b>{len(pending)}</b>\n\n"
             f"Выберите следующую заявку:"
             if lang != "en" else
-            f"❌ <b>Payment #{payment_id} rejected!</b>\n\n"
+            f"❌ <b>Payment #{payment_id} rejected!</b>\n"
+            f"{user_notification_status}\n\n"
             f"📋 Pending: <b>{len(pending)}</b>\n\n"
             f"Select next payment:"
         )
@@ -730,8 +745,14 @@ async def process_payment_rejection(update: Update, context: ContextTypes.DEFAUL
             parse_mode=ParseMode.HTML
         )
     else:
+        user_notification_status = (
+            "✅ Пользователь уведомлен" if user_notified else "⚠️ Не удалось уведомить пользователя"
+        ) if lang != "en" else (
+            "✅ User notified" if user_notified else "⚠️ Failed to notify user"
+        )
         await update.message.reply_text(
-            "✅ Все заявки обработаны!" if lang != "en" else "✅ All payments processed!",
+            f"✅ Все заявки обработаны!\n{user_notification_status}" if lang != "en" 
+            else f"✅ All payments processed!\n{user_notification_status}",
             reply_markup=get_admin_kaspi_panel_keyboard(lang)
         )
 
