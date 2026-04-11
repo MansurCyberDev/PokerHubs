@@ -3,6 +3,7 @@ from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 from handlers import _user_lang
 from keyboards import get_admin_kaspi_panel_keyboard, get_admin_payment_action_keyboard, get_admin_payment_view_keyboard
+from config import SUPPORT_USERNAME
 
 # ==================== KASPI PAY HANDLERS ====================
 
