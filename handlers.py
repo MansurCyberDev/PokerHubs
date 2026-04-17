@@ -2649,6 +2649,8 @@ async def shop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     lang = await _user_lang(user.id)
     data = query.data
+    
+    print(f"SHOP CALLBACK: user={user.id}, data={data}")
 
     player_data = await get_player(user.id, user.username, user.first_name)
 

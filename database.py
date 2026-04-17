@@ -279,22 +279,40 @@ async def buy_skin(user_id: int, skin_id: str, price: int) -> bool:
 
 async def buy_table_skin(user_id: int, skin_id: str, price: int) -> bool:
     """Купить скин стола за золото. Возвращает True если успешно."""
-    async with aiosqlite.connect(DB_NAME) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute("SELECT gold, owned_table_skins FROM players WHERE user_id = ?", (user_id,)) as cursor:
-            row = await cursor.fetchone()
-        if not row or row["gold"] < price:
-            return False
-        owned = json.loads(row["owned_table_skins"] or '["classic"]')
-        if skin_id in owned:
-            return False
-        owned.append(skin_id)
-        await db.execute(
-            "UPDATE players SET gold = gold - ?, owned_table_skins = ?, table_skin = ? WHERE user_id = ?",
-            (price, json.dumps(owned), skin_id, user_id)
-        )
-        await db.commit()
-        return True
+    import traceback
+    try:
+        async with aiosqlite.connect(DB_NAME) as db:
+            db.row_factory = aiosqlite.Row
+            print(f"DB DEBUG: Checking user {user_id}, skin {skin_id}, price {price}")
+            async with db.execute("SELECT gold, owned_table_skins FROM players WHERE user_id = ?", (user_id,)) as cursor:
+                row = await cursor.fetchone()
+            if not row:
+                print(f"DB DEBUG: User {user_id} not found")
+                return False
+            current_gold = row["gold"]
+            owned_skins_json = row["owned_table_skins"]
+            print(f"DB DEBUG: User {user_id} has gold={current_gold}, owned_skins={owned_skins_json}")
+            if current_gold < price:
+                print(f"DB DEBUG: Not enough gold ({current_gold} < {price})")
+                return False
+            owned = json.loads(owned_skins_json or '["classic"]')
+            print(f"DB DEBUG: Parsed owned skins: {owned}")
+            if skin_id in owned:
+                print(f"DB DEBUG: Skin {skin_id} already owned")
+                return False
+            owned.append(skin_id)
+            print(f"DB DEBUG: Adding skin {skin_id}, new owned list: {owned}")
+            await db.execute(
+                "UPDATE players SET gold = gold - ?, owned_table_skins = ?, table_skin = ? WHERE user_id = ?",
+                (price, json.dumps(owned), skin_id, user_id)
+            )
+            await db.commit()
+            print(f"DB DEBUG: Purchase successful for user {user_id}")
+            return True
+    except Exception as e:
+        print(f"DB DEBUG ERROR: {e}")
+        traceback.print_exc()
+        return False
 
 
 async def set_table_skin(user_id: int, skin_id: str):
