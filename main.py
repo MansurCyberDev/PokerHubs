@@ -107,7 +107,7 @@ def main():
 
     # ЛС меню
     application.add_handler(CallbackQueryHandler(menu_callback, pattern="^menu_"))
-    application.add_handler(CallbackQueryHandler(shop_callback, pattern="^(shop_|gold_exchange_)"))
+    application.add_handler(CallbackQueryHandler(shop_callback, pattern="^(shop_|gold_exchange_|table_)"))
     application.add_handler(CallbackQueryHandler(gold_buy_callback, pattern="^gold_buy_"))
     application.add_handler(CallbackQueryHandler(chips_ad_callback, pattern="^chips_"))
     application.add_handler(CallbackQueryHandler(daily_bonus_callback, pattern="^daily_bonus$"))
