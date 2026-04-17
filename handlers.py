@@ -1839,6 +1839,7 @@ async def issue_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"<code>/issue [твой текст]</code>\n\n"
             f"<b>Пример:</b>\n"
             f"<code>/issue Пожалуйста, добавьте новую функцию с ...</code>\n\n"
+            f"Админ ответит вам как можно скорее!"
             if lang != "en" else
             f"🛠 <b>SEND MESSAGE TO DEVELOPER</b>\n"
             f"════════════════════\n\n"
@@ -1846,54 +1847,72 @@ async def issue_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"<code>/issue [your message]</code>\n\n"
             f"<b>Example:</b>\n"
             f"<code>/issue Please add a new feature with ...</code>\n\n"
+            f"Admin will reply as soon as possible!"
         )
         await update.message.reply_text(text, parse_mode=ParseMode.HTML)
         return
     
-    # User provided issue text - forward to developer
+    # User provided issue text
     issue_text = " ".join(args)
     user = update.effective_user
     
-    # Forward message to support if configured
-    if SUPPORT_USERNAME:
-        try:
-            forward_text = (
-                f"📩 <b>Новое обращение</b>\n"
-                f"════════════════════\n\n"
-                f"👤 От: {user.first_name} (@{user.username or 'нет_username'})\n"
-                f"🆔 User ID: <code>{user.id}</code>\n\n"
-                f"📝 Сообщение:\n<i>{issue_text}</i>"
-            )
-            await context.bot.send_message(
-                chat_id=SUPPORT_USERNAME if SUPPORT_USERNAME.isdigit() else None,
-                text=forward_text,
-                parse_mode=ParseMode.HTML
-            )
-            
-            # Confirm to user
-            confirm_text = (
-                f"✅ <b>Сообщение отправлено!</b>\n\n"
-                f"Разработчик получил ваше обращение и ответит вам в ближайшее время.\n\n"
-                f"Спасибо за обратную связь! 🙏"
-                if lang != "en" else
-                f"✅ <b>Message sent!</b>\n\n"
-                f"Developer received your message and will reply soon.\n\n"
-                f"Thank you for your feedback! 🙏"
-            )
-        except Exception as e:
-            print(f"Failed to forward issue: {e}")
-            confirm_text = (
-                f"⚠️ <b>Не удалось отправить сообщение</b>\n\n"
-                f"Напишите напрямую разработчику: @{SUPPORT_USERNAME}"
-                if lang != "en" else
-                f"⚠️ <b>Failed to send message</b>\n\n"
-                f"Please contact developer directly: @{SUPPORT_USERNAME}"
-            )
-    else:
+    try:
+        # Save to database
+        from database import save_issue_message
+        issue_id = await save_issue_message(
+            user_id=user.id,
+            username=user.username or '',
+            first_name=user.first_name,
+            message=issue_text
+        )
+        
+        # Notify all admins
+        from config import ADMIN_IDS
+        from keyboards import get_admin_issue_view_keyboard
+        
+        admin_text = (
+            f"📝 <b>НОВОЕ ОБРАЩЕНИЕ #{issue_id}</b>\n"
+            f"════════════════════\n\n"
+            f"👤 Пользователь: {user.first_name}\n"
+            f"🆔 User ID: <code>{user.id}</code>\n"
+            f"📱 Telegram: @{user.username or 'нет_username'}\n\n"
+            f"💬 Сообщение:\n<i>{issue_text[:500]}{'...' if len(issue_text) > 500 else ''}</i>\n\n"
+            f"✅ Требуется ответ!"
+        )
+        
+        for admin_id in ADMIN_IDS:
+            try:
+                await context.bot.send_message(
+                    admin_id,
+                    admin_text,
+                    reply_markup=get_admin_issue_view_keyboard(issue_id),
+                    parse_mode=ParseMode.HTML
+                )
+            except Exception as e:
+                print(f"Failed to notify admin {admin_id} about issue #{issue_id}: {e}")
+        
+        # Confirm to user
         confirm_text = (
-            f"⚠️ Контакт разработчика пока не настроен."
+            f"✅ <b>Сообщение отправлено!</b>\n\n"
+            f"📩 Обращение #{issue_id} зарегистрировано.\n"
+            f"Администратор ответит вам как можно скорее.\n\n"
+            f"Спасибо за обратную связь! 🙏"
             if lang != "en" else
-            f"⚠️ Developer contact is not configured yet."
+            f"✅ <b>Message sent!</b>\n\n"
+            f"📩 Issue #{issue_id} registered.\n"
+            f"Admin will reply as soon as possible.\n\n"
+            f"Thank you for your feedback! 🙏"
+        )
+    except Exception as e:
+        print(f"Failed to save issue: {e}")
+        import traceback
+        traceback.print_exc()
+        confirm_text = (
+            f"⚠️ <b>Не удалось отправить сообщение</b>\n\n"
+            f"Попробуйте позже или свяжитесь напрямую: @{SUPPORT_USERNAME or 'admin'}"
+            if lang != "en" else
+            f"⚠️ <b>Failed to send message</b>\n\n"
+            f"Please try again later or contact directly: @{SUPPORT_USERNAME or 'admin'}"
         )
     
     await update.message.reply_text(confirm_text, parse_mode=ParseMode.HTML)

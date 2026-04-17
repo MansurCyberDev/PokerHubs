@@ -16,7 +16,7 @@ from handlers import (
     inventory_command, inventory_callback, shop_command
 )
 from kaspi_handlers import (
-    kaspi_callback, kaspi_receipt_photo_handler, admin_kaspi_callback, admin_kaspi_text_handler
+    kaspi_callback, kaspi_receipt_photo_handler, admin_kaspi_callback, admin_kaspi_text_handler, admin_issues_callback
 )
 
 logging.basicConfig(
@@ -117,6 +117,7 @@ def main():
     # Kaspi Pay handlers
     application.add_handler(CallbackQueryHandler(kaspi_callback, pattern="^kaspi_"))
     application.add_handler(CallbackQueryHandler(admin_kaspi_callback, pattern="^admin_kaspi_|^admin_approve_|^admin_reject_|^admin_view_payment_|^admin_approve_comment_"))
+    application.add_handler(CallbackQueryHandler(admin_issues_callback, pattern="^admin_issues|admin_view_issue_|admin_reply_issue_"))
     
     # Фото чеков Kaspi (высший приоритет в группе фото)
     application.add_handler(MessageHandler(

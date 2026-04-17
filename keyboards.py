@@ -54,11 +54,15 @@ def get_shop_keyboard(owned_skins: list, current_skin: str, lang: str = "ru", ba
     keyboard = []
     for skin_id, skin in SKINS.items():
         if skin_id in owned_skins:
-            status_icon = "✨" if skin_id == current_skin else "✅"
-            label = f"{status_icon} {skin['name']} ({'equipped' if is_en else 'надето'})"
+            if skin_id == current_skin:
+                status_icon = "✨"
+                label = f"{status_icon} {skin['name']} ({'equipped' if is_en else 'надето'})"
+            else:
+                status_icon = "✅"
+                label = f"{status_icon} {skin['name']} ({'owned' if is_en else 'в инвентаре'})"
             cb = f"shop_equip_{skin_id}"
         else:
-            label = f"🔒 {skin['name']} — {skin['price']} 💎"
+            label = f"🔒 {skin['name']} — {skin['price']} 🪙"
             cb = f"shop_buy_{skin_id}"
         keyboard.append([InlineKeyboardButton(label, callback_data=cb)])
     # Add dynamic back button if provided, otherwise default to shop categories
@@ -76,11 +80,15 @@ def get_table_skins_keyboard(owned_skins: list, current_skin: str, lang: str = "
     keyboard = []
     for skin_id, skin in TABLE_SKINS.items():
         if skin_id in owned_skins:
-            status_icon = "✨" if skin_id == current_skin else "✅"
-            label = f"{status_icon} {skin['name']} ({'equipped' if is_en else 'надето'})"
+            if skin_id == current_skin:
+                status_icon = "✨"
+                label = f"{status_icon} {skin['name']} ({'equipped' if is_en else 'надето'})"
+            else:
+                status_icon = "✅"
+                label = f"{status_icon} {skin['name']} ({'owned' if is_en else 'в инвентаре'})"
             cb = f"table_equip_{skin_id}"
         else:
-            label = f"🔒 {skin['name']} — {skin['price']} 💎"
+            label = f"🔒 {skin['name']} — {skin['price']} 🪙"
             cb = f"table_buy_{skin_id}"
         keyboard.append([InlineKeyboardButton(label, callback_data=cb)])
     # Add dynamic back button if provided, otherwise default to shop categories
@@ -367,7 +375,7 @@ GOLD_EXCHANGE_RATES = {
     "gold_exchange_100": {"gold_cost": 100, "chips": 1000, "bonus": "+0%"},
     "gold_exchange_200": {"gold_cost": 200, "chips": 2500, "bonus": "+25% выгода"},
     "gold_exchange_300": {"gold_cost": 300, "chips": 4000, "bonus": "+33% выгода 🔥"},
-    "gold_exchange_500": {"gold_cost": 500, "chips": 7500, "bonus": "+50% выгода �💎"},
+    "gold_exchange_500": {"gold_cost": 500, "chips": 7500, "bonus": "+50% выгода 💎"},
 }
 
 def get_gold_exchange_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
@@ -423,6 +431,10 @@ def get_admin_kaspi_panel_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
         [InlineKeyboardButton(
             "📊 " + ("Payment statistics" if is_en else "Статистика платежей"), 
             callback_data="admin_kaspi_stats"
+        )],
+        [InlineKeyboardButton(
+            "📝 " + ("User issues" if is_en else "Обращения пользователей"), 
+            callback_data="admin_issues"
         )],
         [InlineKeyboardButton("🔙 " + ("Back" if is_en else "Назад"), callback_data="menu_main")],
     ]
@@ -480,13 +492,84 @@ def get_admin_payment_action_keyboard(payment_id: int, lang: str = "ru") -> Inli
                 callback_data=f"admin_reject_{payment_id}"
             ),
         ],
-        [InlineKeyboardButton(
-            "📝 " + ("Approve with comment" if is_en else "Одобрить с комментом"),
-            callback_data=f"admin_approve_comment_{payment_id}"
-        )],
+
         [InlineKeyboardButton(
             "📋 " + ("Back to list" if is_en else "Назад к списку"),
             callback_data="admin_kaspi_pending"
         )],
     ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+# ==================== ADMIN ISSUES KEYBOARDS ====================
+
+def get_admin_issues_panel_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
+    """Главная клавиатура панели обращений (Issues)."""
+    is_en = lang == "en"
+    keyboard = [
+        [InlineKeyboardButton(
+            "📝 " + ("Pending Issues" if is_en else "Ожидающие обращения"),
+            callback_data="admin_issues_pending"
+        )],
+        [InlineKeyboardButton(
+            "📊 " + ("Statistics" if is_en else "Статистика"),
+            callback_data="admin_issues_stats"
+        )],
+        [InlineKeyboardButton(
+            "🔙 " + ("Back to Admin" if is_en else "Назад к админке"),
+            callback_data="menu_admin"
+        )],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_admin_issue_view_keyboard(issue_id: int, lang: str = "ru") -> InlineKeyboardMarkup:
+    """Клавиатура для просмотра обращения с кнопкой ответа."""
+    is_en = lang == "en"
+    keyboard = [
+        [InlineKeyboardButton(
+            "💬 " + ("Reply" if is_en else "Ответить"),
+            callback_data=f"admin_reply_issue_{issue_id}"
+        )],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_admin_issue_action_keyboard(issue_id: int, lang: str = "ru") -> InlineKeyboardMarkup:
+    """Клавиатура действий над обращением (после просмотра)."""
+    is_en = lang == "en"
+    keyboard = [
+        [InlineKeyboardButton(
+            "💬 " + ("Reply" if is_en else "Ответить"),
+            callback_data=f"admin_reply_issue_{issue_id}"
+        )],
+        [InlineKeyboardButton(
+            "📋 " + ("Back to list" if is_en else "Назад к списку"),
+            callback_data="admin_issues_pending"
+        )],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_admin_pending_issues_keyboard(pending_issues: List[Dict], lang: str = "ru") -> InlineKeyboardMarkup:
+    """Клавиатура со списком ожидающих обращений."""
+    is_en = lang == "en"
+    keyboard = []
+    
+    for issue in pending_issues:
+        issue_id = issue['id']
+        user_name = issue.get('first_name', 'Unknown')
+        preview = issue.get('message', '')[:30]
+        
+        keyboard.append([InlineKeyboardButton(
+            f"📝 #{issue_id} — {user_name}: {preview}...",
+            callback_data=f"admin_view_issue_{issue_id}"
+        )])
+    
+    # Add back button
+    keyboard.append([InlineKeyboardButton(
+        "🔙 " + ("Back to issues" if is_en else "Назад к обращениям"),
+        callback_data="admin_issues"
+    )])
+    
     return InlineKeyboardMarkup(keyboard)

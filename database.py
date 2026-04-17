@@ -76,6 +76,21 @@ async def init_db():
             )
         ''')
 
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS issue_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                username TEXT,
+                first_name TEXT,
+                message TEXT,
+                status TEXT DEFAULT 'pending',
+                admin_reply TEXT,
+                created_at TEXT,
+                replied_at TEXT,
+                replied_by INTEGER
+            )
+        ''')
+
         await db.commit()
         
         # Enable WAL mode for better concurrency (high load optimization)
@@ -508,4 +523,78 @@ async def get_payment_stats() -> Dict:
             "approved": approved,
             "rejected": rejected,
             "total_revenue_kzt": total_revenue
+        }
+
+
+# ==================== ISSUE MESSAGES ====================
+
+async def save_issue_message(user_id: int, username: str, first_name: str, message: str) -> int:
+    """Save issue message to database and return issue ID"""
+    from datetime import datetime
+    async with aiosqlite.connect(DB_NAME) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute('''
+            INSERT INTO issue_messages (user_id, username, first_name, message, status, created_at)
+            VALUES (?, ?, ?, ?, 'pending', ?)
+        ''', (user_id, username, first_name, message, datetime.now().isoformat()))
+        await db.commit()
+        return cursor.lastrowid
+
+
+async def get_pending_issues() -> List[Dict]:
+    """Get all pending issue messages for admin panel"""
+    async with aiosqlite.connect(DB_NAME) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute('''
+            SELECT * FROM issue_messages 
+            WHERE status = 'pending' 
+            ORDER BY created_at DESC
+        ''') as cursor:
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+
+
+async def get_issue(issue_id: int) -> Optional[Dict]:
+    """Get issue message by ID"""
+    async with aiosqlite.connect(DB_NAME) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM issue_messages WHERE id = ?", (issue_id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            return dict(row) if row else None
+
+
+async def reply_to_issue(issue_id: int, admin_id: int, reply_text: str) -> bool:
+    """Mark issue as replied with admin response"""
+    from datetime import datetime
+    async with aiosqlite.connect(DB_NAME) as db:
+        result = await db.execute('''
+            UPDATE issue_messages 
+            SET status = 'replied', 
+                replied_at = ?, 
+                replied_by = ?,
+                admin_reply = ?
+            WHERE id = ? AND status = 'pending'
+        ''', (datetime.now().isoformat(), admin_id, reply_text, issue_id))
+        await db.commit()
+        return result.rowcount > 0
+
+
+async def get_issue_stats() -> Dict:
+    """Get statistics about issue messages"""
+    async with aiosqlite.connect(DB_NAME) as db:
+        async with db.execute("SELECT COUNT(*) FROM issue_messages") as cursor:
+            total = (await cursor.fetchone())[0]
+        
+        async with db.execute("SELECT COUNT(*) FROM issue_messages WHERE status = 'pending'") as cursor:
+            pending = (await cursor.fetchone())[0]
+        
+        async with db.execute("SELECT COUNT(*) FROM issue_messages WHERE status = 'replied'") as cursor:
+            replied = (await cursor.fetchone())[0]
+        
+        return {
+            "total": total,
+            "pending": pending,
+            "replied": replied
         }

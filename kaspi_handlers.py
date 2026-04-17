@@ -781,3 +781,254 @@ async def admin_kaspi_text_handler(update: Update, context: ContextTypes.DEFAULT
         payment_id = context.user_data.pop('approving_payment')
         await process_payment_approval(update, context, payment_id, text, lang)
         return
+    
+    # Check if admin is replying to an issue
+    if 'replying_to_issue' in context.user_data:
+        issue_id = context.user_data.pop('replying_to_issue')
+        await process_issue_reply(update, context, issue_id, text, lang)
+        return
+
+
+# ==================== ADMIN ISSUES HANDLERS ====================
+
+async def admin_issues_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle admin issues panel callbacks."""
+    query = update.callback_query
+    user = update.effective_user
+    
+    # Check if user is admin
+    from config import ADMIN_IDS
+    if user.id not in ADMIN_IDS:
+        await query.answer("⛔ Только для админов!", show_alert=True)
+        return
+    
+    data = query.data
+    lang = await _user_lang(user.id)
+    is_en = lang == "en"
+    
+    if data == "admin_issues":
+        # Show issues panel main menu
+        from keyboards import get_admin_issues_panel_keyboard
+        text = (
+            f"📝 <b>ПАНЕЛЬ ОБРАЩЕНИЙ</b>\n"
+            f"════════════════════\n\n"
+            f"Управление обращениями пользователей:\n\n"
+            f"📝 Просмотр ожидающих\n"
+            f"📊 Статистика\n"
+            f"💬 Ответы на сообщения"
+        ) if not is_en else (
+            f"📝 <b>ISSUES PANEL</b>\n"
+            f"════════════════════\n\n"
+            f"Manage user issues:\n\n"
+            f"📝 View pending\n"
+            f"📊 Statistics\n"
+            f"💬 Reply to messages"
+        )
+        await query.edit_message_text(
+            text,
+            reply_markup=get_admin_issues_panel_keyboard(lang),
+            parse_mode=ParseMode.HTML
+        )
+        
+    elif data == "admin_issues_pending":
+        # Show pending issues list
+        from database import get_pending_issues
+        from keyboards import get_admin_pending_issues_keyboard
+        pending = await get_pending_issues()
+        
+        if not pending:
+            await query.edit_message_text(
+                "✅ Нет ожидающих обращений" if not is_en else "✅ No pending issues",
+                reply_markup=get_admin_issues_panel_keyboard(lang)
+            )
+            return
+        
+        text = (
+            f"📝 <b>ОЖИДАЮЩИЕ ОБРАЩЕНИЯ</b>\n"
+            f"════════════════════\n\n"
+            f"Всего: <b>{len(pending)}</b>\n\n"
+            f"Выберите обращение для просмотра:"
+        ) if not is_en else (
+            f"📝 <b>PENDING ISSUES</b>\n"
+            f"════════════════════\n\n"
+            f"Total: <b>{len(pending)}</b>\n\n"
+            f"Select an issue to view:"
+        )
+        
+        await query.edit_message_text(
+            text,
+            reply_markup=get_admin_pending_issues_keyboard(pending, lang),
+            parse_mode=ParseMode.HTML
+        )
+        
+    elif data == "admin_issues_stats":
+        # Show issue statistics
+        from database import get_issue_stats
+        stats = await get_issue_stats()
+        
+        text = (
+            f"📊 <b>СТАТИСТИКА ОБРАЩЕНИЙ</b>\n"
+            f"════════════════════\n\n"
+            f"📋 Всего: <b>{stats['total']}</b>\n"
+            f"⏳ Ожидают: <b>{stats['pending']}</b>\n"
+            f"✅ Отвечено: <b>{stats['replied']}</b>"
+        ) if not is_en else (
+            f"📊 <b>ISSUE STATISTICS</b>\n"
+            f"════════════════════\n\n"
+            f"📋 Total: <b>{stats['total']}</b>\n"
+            f"⏳ Pending: <b>{stats['pending']}</b>\n"
+            f"✅ Replied: <b>{stats['replied']}</b>"
+        )
+        
+        await query.edit_message_text(
+            text,
+            reply_markup=get_admin_issues_panel_keyboard(lang),
+            parse_mode=ParseMode.HTML
+        )
+        
+    elif data.startswith("admin_view_issue_"):
+        issue_id = int(data.replace("admin_view_issue_", ""))
+        
+        from database import get_issue
+        from keyboards import get_admin_issue_action_keyboard
+        issue = await get_issue(issue_id)
+        
+        if not issue:
+            await query.answer("❌ Обращение не найдено", show_alert=True)
+            return
+        
+        text = (
+            f"📝 <b>ОБРАЩЕНИЕ #{issue['id']}</b>\n"
+            f"════════════════════\n\n"
+            f"👤 Пользователь: {issue['first_name']}\n"
+            f"🆔 User ID: <code>{issue['user_id']}</code>\n"
+            f"📱 Telegram: @{issue['username'] or 'нет_username'}\n"
+            f"🕐 Создано: {issue['created_at'][:16] if issue['created_at'] else '—'}\n\n"
+            f"💬 Сообщение:\n<i>{issue['message']}</i>"
+        ) if not is_en else (
+            f"📝 <b>ISSUE #{issue['id']}</b>\n"
+            f"════════════════════\n\n"
+            f"👤 User: {issue['first_name']}\n"
+            f"🆔 User ID: <code>{issue['user_id']}</code>\n"
+            f"📱 Telegram: @{issue['username'] or 'no_username'}\n"
+            f"🕐 Created: {issue['created_at'][:16] if issue['created_at'] else '—'}\n\n"
+            f"💬 Message:\n<i>{issue['message']}</i>"
+        )
+        
+        await query.edit_message_text(
+            text,
+            reply_markup=get_admin_issue_action_keyboard(issue_id, lang),
+            parse_mode=ParseMode.HTML
+        )
+        
+    elif data.startswith("admin_reply_issue_"):
+        issue_id = int(data.replace("admin_reply_issue_", ""))
+        context.user_data['replying_to_issue'] = issue_id
+        
+        text = (
+            "💬 Введи ответ на обращение:\n"
+            "(сообщение будет отправлено пользователю)"
+        ) if not is_en else (
+            "💬 Enter your reply:\n"
+            "(message will be sent to user)"
+        )
+        
+        await query.edit_message_text(text, parse_mode=ParseMode.HTML)
+
+
+async def process_issue_reply(update: Update, context: ContextTypes.DEFAULT_TYPE,
+                              issue_id: int, reply_text: str, lang: str):
+    """Process admin reply to issue and notify user."""
+    from database import reply_to_issue, get_issue
+    from config import ADMIN_IDS
+    
+    admin = update.effective_user
+    success = await reply_to_issue(issue_id, admin.id, reply_text)
+    
+    if not success:
+        await update.message.reply_text(
+            "❌ Обращение не найдено или уже отвечено" if lang != "en" else "❌ Issue not found or already replied"
+        )
+        return
+    
+    # Get issue info to notify user
+    issue = await get_issue(issue_id)
+    user_id = issue['user_id']
+    
+    # Notify user about reply
+    user_notified = False
+    try:
+        text = (
+            f"📩 <b>ОТВЕТ ОТ АДМИНИСТРАТОРА</b>\n\n"
+            f"По обращению #{issue_id}:\n\n"
+            f"<b>Ваше сообщение:</b>\n"
+            f"<i>{issue['message'][:200]}{'...' if len(issue['message']) > 200 else ''}</i>\n\n"
+            f"<b>Ответ:</b>\n"
+            f"{reply_text}\n\n"
+            f"Если есть ещё вопросы — используй /issue"
+        ) if lang != "en" else (
+            f"📩 <b>ADMIN REPLY</b>\n\n"
+            f"Regarding issue #{issue_id}:\n\n"
+            f"<b>Your message:</b>\n"
+            f"<i>{issue['message'][:200]}{'...' if len(issue['message']) > 200 else ''}</i>\n\n"
+            f"<b>Reply:</b>\n"
+            f"{reply_text}\n\n"
+            f"For more questions use /issue"
+        )
+        
+        await context.bot.send_message(user_id, text, parse_mode=ParseMode.HTML)
+        user_notified = True
+        print(f"✅ User {user_id} notified about reply to issue #{issue_id}")
+    except Exception as e:
+        print(f"❌ Failed to notify user {user_id} about issue reply: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    # Show confirmation to admin
+    from database import get_pending_issues
+    from keyboards import get_admin_pending_issues_keyboard, get_admin_issues_panel_keyboard
+    pending = await get_pending_issues()
+    
+    user_notification_status = (
+        "✅ Пользователь уведомлен" if user_notified else "⚠️ Не удалось уведомить пользователя"
+    ) if lang != "en" else (
+        "✅ User notified" if user_notified else "⚠️ Failed to notify user"
+    )
+    
+    if pending:
+        text = (
+            (
+                f"✅ <b>Ответ отправлен по обращению #{issue_id}!</b>\n"
+                f"{user_notification_status}\n\n"
+                f"📋 Осталось обращений: <b>{len(pending)}</b>\n\n"
+                f"Выберите следующее обращение:"
+            ) if lang != "en" else
+            (
+                f"✅ <b>Reply sent for issue #{issue_id}!</b>\n"
+                f"{user_notification_status}\n\n"
+                f"📋 Pending: <b>{len(pending)}</b>\n\n"
+                f"Select next issue:"
+            )
+        )
+        
+        await update.message.reply_text(
+            text,
+            reply_markup=get_admin_pending_issues_keyboard(pending, lang),
+            parse_mode=ParseMode.HTML
+        )
+    else:
+        text = (
+            (
+                f"✅ <b>Ответ отправлен!</b>\n{user_notification_status}\n\n"
+                f"Все обращения обработаны!"
+            ) if lang != "en" else
+            (
+                f"✅ <b>Reply sent!</b>\n{user_notification_status}\n\n"
+                f"All issues processed!"
+            )
+        )
+        
+        await update.message.reply_text(
+            text,
+            reply_markup=get_admin_issues_panel_keyboard(lang)
+        )

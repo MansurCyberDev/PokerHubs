@@ -2,7 +2,7 @@
 Система скинов для колод карт и столов.
 """
 
-# Скины для карт
+# Скины для карт (только те, что есть в Cards Design)
 SKINS = {
     "classic": {
         "name": "🃏 Classic",
@@ -10,55 +10,6 @@ SKINS = {
         "price": 0,
         "suits": {"♠": "♠️", "♥": "♥️", "♦": "♦️", "♣": "♣️"},
         "preview": "A♠️ K♥️ Q♦️ J♣️"
-    },
-    "ornamental": {
-        "name": "🪄 Ornamental",
-        "description": "Орнаментальная колода с узорами",
-        "price": 150,
-        "suits": {"♠": "♠️", "♥": "♥️", "♦": "♦️", "♣": "♣️"},
-        "preview": "A♠️ K♥️ Q♦️ J♣️"
-    },
-    "minimalist": {
-        "name": "⬜ Minimalist",
-        "description": "Чистый минималистичный дизайн",
-        "price": 200,
-        "suits": {"♠": "♠️", "♥": "♥️", "♦": "♦️", "♣": "♣️"},
-        "preview": "A♠️ K♥️ Q♦️ J♣️"
-    },
-    "golden": {
-        "name": "👑 Golden",
-        "description": "Золотые края и рубиновые масти",
-        "price": 400,
-        "suits": {"♠": "🖤", "♥": "❤️", "♦": "🔶", "♣": "🍀"},
-        "preview": "A🖤 K❤️ Q🔶 J🍀"
-    },
-    "royal": {
-        "name": "🏰 Royal",
-        "description": "Королевская колода с гербами",
-        "price": 600,
-        "suits": {"♠": "⚔️", "♥": "🛡️", "♦": "👑", "♣": "⚜️"},
-        "preview": "A⚔️ K🛡️ Q👑 J⚜️"
-    },
-    "neon": {
-        "name": "🌈 Neon",
-        "description": "Неоновая светящаяся колода",
-        "price": 800,
-        "suits": {"♠": "💜", "♥": "💖", "♦": "💙", "♣": "💚"},
-        "preview": "A💜 K💖 Q💙 J💚"
-    },
-    "dark": {
-        "name": "🖤 Dark Elite",
-        "description": "Тёмная премиум колода для профи",
-        "price": 1000,
-        "suits": {"♠": "♠️", "♥": "🩸", "♦": "🔴", "♣": "⚫"},
-        "preview": "A♠️ K🩸 Q🔴 J⚫"
-    },
-    "anime": {
-        "name": "🎌 Anime",
-        "description": "Колода в стиле аниме",
-        "price": 1200,
-        "suits": {"♠": "🌸", "♥": "🌺", "♦": "⭐", "♣": "🎋"},
-        "preview": "A🌸 K🌺 Q⭐ J🎋"
     },
 }
 
@@ -83,10 +34,10 @@ TABLE_SKINS = {
         "border_style": "wood"
     },
     "blue": {
-        "name": "� Синий",
+        "name": "🔵 Синий",
         "description": "Спокойный синий стол",
         "price": 150,
-        "emoji": "�",
+        "emoji": "🔵",
         "color": "#1e3a5f",
         "felt_texture": "solid",
         "border_style": "wood"
