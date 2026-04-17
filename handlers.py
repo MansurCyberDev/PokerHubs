@@ -2907,8 +2907,11 @@ async def shop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         skin_id = data.replace("table_buy_", "")
         skin = TABLE_SKINS.get(skin_id)
         if not skin:
+            print(f"DEBUG: Table skin {skin_id} not found in TABLE_SKINS")
             return
+        print(f"DEBUG: Buying table skin {skin_id} for user {user.id}, price {skin['price']}")
         success = await buy_table_skin(user.id, skin_id, skin['price'])
+        print(f"DEBUG: buy_table_skin returned {success}")
         if success:
             # Send success message with inventory notification
             success_text = (
@@ -2932,20 +2935,39 @@ async def shop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 show_alert=True
             )
         else:
+            # Re-fetch player data to get current gold
+            current_data = await get_player(user.id)
+            current_gold = current_data.get('gold', 0)
             await query.answer(
-                f"❌ Need {skin['price']} 🪙, you have {player_data.get('gold',0)} 🪙"
+                f"❌ Need {skin['price']} 🪙, you have {current_gold} 🪙"
                 if lang == "en" else
-                f"❌ Нужно {skin['price']} 🪙, у тебя {player_data.get('gold',0)} 🪙",
+                f"❌ Нужно {skin['price']} 🪙, у тебя {current_gold} 🪙",
                 show_alert=True
             )
+        # Refresh the table skins menu after purchase attempt
+        player_data = await get_player(user.id)
+        owned = json.loads(player_data.get('owned_table_skins') or '["classic"]')
+        current_skin = player_data.get('table_skin', 'classic')
+        text = (
+            f"🎰 <b>TABLE SKINS</b>\n🪙 Your gold: <b>{player_data.get('gold', 0)}</b>\n\n"
+            if lang == "en" else
+            f"🎰 <b>СКИНЫ СТОЛОВ</b>\n🪙 Твоё золото: <b>{player_data.get('gold', 0)}</b>\n\n"
+        )
+        for sid, skin_info in TABLE_SKINS.items():
+            status = "✅" if sid in owned else f"{skin_info['price']} 🪙"
+            text += f"{skin_info['emoji']} {skin_info['name']} — {status}\n   <i>{skin_info['description']}</i>\n"
+        await safe_edit_message_text(query, text, reply_markup=get_table_skins_keyboard(owned, current_skin, lang=lang), parse_mode=ParseMode.HTML)
+        return
 
     # Table skin equip
     elif data.startswith("table_equip_"):
         skin_id = data.replace("table_equip_", "")
         owned = json.loads(player_data.get('owned_table_skins') or '["classic"]')
+        print(f"DEBUG: Equipping table skin {skin_id}, owned: {owned}")
         if skin_id in owned:
             await set_table_skin(user.id, skin_id)
             skin_name = TABLE_SKINS[skin_id]['name']
+            print(f"DEBUG: Table skin {skin_id} equipped successfully")
             
             # Send success message
             success_text = (
@@ -2965,6 +2987,12 @@ async def shop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             await query.answer(
                 f"✅ {skin_name} equipped!" if lang == "en" else f"✅ {skin_name} активирован!",
+                show_alert=True
+            )
+        else:
+            print(f"DEBUG: Skin {skin_id} not in owned list: {owned}")
+            await query.answer(
+                "❌ You don't own this skin!" if lang == "en" else "❌ У тебя нет этого скина!",
                 show_alert=True
             )
 
