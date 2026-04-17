@@ -5,9 +5,16 @@
 # Скины для карт (только те, что есть в Cards Design)
 SKINS = {
     "classic": {
-        "name": "🃏 Classic",
-        "description": "Стандартная покерная колода",
+        "name": "🃏 Bordered",
+        "description": "Классическая колода с рамкой",
         "price": 0,
+        "suits": {"♠": "♠️", "♥": "♥️", "♦": "♦️", "♣": "♣️"},
+        "preview": "A♠️ K♥️ Q♦️ J♣️"
+    },
+    "ornate": {
+        "name": "🪄 Ornamental",
+        "description": "Орнаментальная колода с узорами",
+        "price": 150,
         "suits": {"♠": "♠️", "♥": "♥️", "♦": "♦️", "♣": "♣️"},
         "preview": "A♠️ K♥️ Q♦️ J♣️"
     },
