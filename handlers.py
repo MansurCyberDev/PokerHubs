@@ -3381,22 +3381,28 @@ async def daily_bonus_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             # Answer callback immediately to prevent timeout
             await query.answer("🎰 Spinning..." if lang == "en" else "🎰 Крутим...")
             
-            # Slot machine symbols
-            symbols = ["🍒", "🍋", "🍊", "🍇", "💎", "7️⃣", "💰", "⭐"]
+            # Slot machine symbols - using single-width emojis for consistency
+            symbols = ["🍒", "🍋", "🍊", "🍇", "💎", "7️", "💰", "⭐"]
+            
+            # Helper to create slot display with consistent spacing
+            def slot_box(s1, s2, s3):
+                return (
+                    f"╔═════╦═════╦═════╗\n"
+                    f"║ {s1} ║ {s2} ║ {s3} ║\n"
+                    f"╚═════╩═════╩═════╝"
+                )
             
             # Send initial slot machine message
             slot_display = (
-                f"🎰 <b>SLOT MACHINE</b> 🎰\n"
-                f"════════════════════\n\n"
-                f"┏━━━━━┳━━━━━┳━━━━━┓\n"
-                f"┃  ❓  ┃  ❓  ┃  ❓  ┃\n"
-                f"┗━━━━━┻━━━━━┻━━━━━┛\n\n"
-                f"{'Spinning...' if lang == 'en' else 'Крутим барабан...'}"
+                f"{'🎰 DAILY BONUS 🎰' if lang == 'en' else '🎰 ЕЖЕДНЕВНЫЙ БОНУС 🎰'}\n"
+                f"{'─' * 17}\n\n"
+                f"{slot_box('❓', '❓', '❓')}\n\n"
+                f"{'▶️ Spinning...' if lang == 'en' else '▶️ Крутим...'}"
             )
             
             spin_msg = await context.bot.send_message(
                 user.id,
-                slot_display,
+                f"<code>{slot_display}</code>",
                 parse_mode=ParseMode.HTML
             )
             
@@ -3405,16 +3411,14 @@ async def daily_bonus_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             for i in range(5):
                 s1, s2, s3 = random.choice(symbols), random.choice(symbols), random.choice(symbols)
                 animated_display = (
-                    f"🎰 <b>SLOT MACHINE</b> 🎰\n"
-                    f"════════════════════\n\n"
-                    f"┏━━━━━┳━━━━━┳━━━━━┓\n"
-                    f"┃  {s1}  ┃  {s2}  ┃  {s3}  ┃\n"
-                    f"┗━━━━━┻━━━━━┻━━━━━┛\n\n"
-                    f"{'Spinning...' if lang == 'en' else 'Крутим барабан...'}"
+                    f"{'🎰 DAILY BONUS 🎰' if lang == 'en' else '🎰 ЕЖЕДНЕВНЫЙ БОНУС 🎰'}\n"
+                    f"{'─' * 17}\n\n"
+                    f"{slot_box(s1, s2, s3)}\n\n"
+                    f"{'▶️ Spinning...' if lang == 'en' else '▶️ Крутим...'}"
                 )
                 try:
                     await context.bot.edit_message_text(
-                        animated_display,
+                        f"<code>{animated_display}</code>",
                         chat_id=user.id,
                         message_id=spin_msg.message_id,
                         parse_mode=ParseMode.HTML
@@ -3438,17 +3442,15 @@ async def daily_bonus_callback(update: Update, context: ContextTypes.DEFAULT_TYP
                 s1, s2, s3 = loss_symbols[0], loss_symbols[1], loss_symbols[2]
                 
                 loss_display = (
-                    f"🎰 <b>SLOT MACHINE</b> 🎰\n"
-                    f"════════════════════\n\n"
-                    f"┏━━━━━┳━━━━━┳━━━━━┓\n"
-                    f"┃  {s1}  ┃  {s2}  ┃  {s3}  ┃\n"
-                    f"┗━━━━━┻━━━━━┻━━━━━┛\n\n"
-                    f"❌ <b>{'NOT THIS TIME!' if lang == 'en' else 'НЕ ПОВЕЗЛО!'}</b>\n"
+                    f"{'🎰 DAILY BONUS 🎰' if lang == 'en' else '🎰 ЕЖЕДНЕВНЫЙ БОНУС 🎰'}\n"
+                    f"{'─' * 17}\n\n"
+                    f"{slot_box(s1, s2, s3)}\n\n"
+                    f"{'❌ NOT THIS TIME!' if lang == 'en' else '❌ НЕ ПОВЕЗЛО!'}\n"
                     f"{'Try again tomorrow!' if lang == 'en' else 'Попробуй снова завтра!'} 😢"
                 )
                 
                 await context.bot.edit_message_text(
-                    loss_display,
+                    f"<code>{loss_display}</code>",
                     chat_id=user.id,
                     message_id=spin_msg.message_id,
                     parse_mode=ParseMode.HTML
@@ -3469,7 +3471,7 @@ async def daily_bonus_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             # WIN - determine prize with fixed probabilities (low chance for big prizes)
             prizes = [
                 ("💎💎💎", 5000, 0.02),    # 2% - Jackpot (very rare)
-                ("7️⃣7️⃣7️⃣", 3000, 0.05),   # 5% - Big win
+                ("7️7️7️", 3000, 0.05),     # 5% - Big win
                 ("💰💰💰", 2000, 0.13),    # 13% - Medium
                 ("🍇🍇🍇", 1000, 0.30),    # 30% - Small
                 ("🍊🍊🍊", 500, 0.50),      # 50% - Tiny (most common when winning)
@@ -3492,8 +3494,8 @@ async def daily_bonus_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             # Handle multi-char emojis properly
             if winning_combo == "💎💎💎":
                 s1, s2, s3 = "💎", "💎", "💎"
-            elif winning_combo == "7️⃣7️⃣7️⃣":
-                s1, s2, s3 = "7️⃣", "7️⃣", "7️⃣"
+            elif winning_combo == "7️7️7️":
+                s1, s2, s3 = "7️", "7️", "7️"
             elif winning_combo == "💰💰💰":
                 s1, s2, s3 = "💰", "💰", "💰"
             elif winning_combo == "🍇🍇🍇":
@@ -3504,17 +3506,15 @@ async def daily_bonus_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             # Show final winning result
             is_jackpot = prize >= 3000
             win_display = (
-                f"🎰 <b>SLOT MACHINE</b> 🎰\n"
-                f"════════════════════\n\n"
-                f"┏━━━━━┳━━━━━┳━━━━━┓\n"
-                f"┃  {s1}  ┃  {s2}  ┃  {s3}  ┃\n"
-                f"┗━━━━━┻━━━━━┻━━━━━┛\n\n"
+                f"{'🎰 DAILY BONUS 🎰' if lang == 'en' else '🎰 ЕЖЕДНЕВНЫЙ БОНУС 🎰'}\n"
+                f"{'─' * 17}\n\n"
+                f"{slot_box(s1, s2, s3)}\n\n"
                 f"{'🎉 JACKPOT!' if is_jackpot else '✅ WIN!' if lang == 'en' else '🎉 ДЖЕКПОТ!' if is_jackpot else '✅ ВЫИГРЫШ!'}\n"
                 f"<b>+{prize} {'chips' if lang == 'en' else 'фишек'}</b> 🎉"
             )
             
             await context.bot.edit_message_text(
-                win_display,
+                f"<code>{win_display}</code>",
                 chat_id=user.id,
                 message_id=spin_msg.message_id,
                 parse_mode=ParseMode.HTML
