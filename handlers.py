@@ -31,7 +31,30 @@ from utils import (
 )
 from cards import HandEvaluator
 from skins import SKINS, DEFAULT_SKIN, TABLE_SKINS, DEFAULT_TABLE_SKIN
-from config import MIN_PLAYERS, REGISTRATION_TIME, SMALL_BLIND, BIG_BLIND, ADMIN_IDS, SUPPORT_USERNAME
+from config import MIN_PLAYERS, REGISTRATION_TIME, SMALL_BLIND, BIG_BLIND, ADMIN_IDS, SUPPORT_USERNAME, KASPI_PHONE_NUMBER
+from health_check import get_rate_limiter
+
+# Rate limiting decorator
+def rate_limited(func):
+    """Decorator to apply rate limiting to handlers."""
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        user_id = update.effective_user.id
+        limiter = get_rate_limiter()
+        
+        # Admins bypass rate limiting
+        if user_id in ADMIN_IDS:
+            return await func(update, context)
+        
+        allowed, message = limiter.is_allowed(user_id)
+        if not allowed:
+            if update.callback_query:
+                await update.callback_query.answer(message, show_alert=True)
+            elif update.message:
+                await update.message.reply_text(message)
+            return
+        
+        return await func(update, context)
+    return wrapper
 
 # user_id -> active game chat_id (для работы кнопок из ЛС)
 user_active_games = {}
@@ -2765,7 +2788,7 @@ async def shop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"════════════════════\n\n"
             f"Purchase gold via Kaspi Pay (Kazakhstan):\n\n"
             f"💰 Payment: Kaspi transfer\n"
-            f"📱 To: +77012345678\n"
+            f"📱 To: {KASPI_PHONE_NUMBER}\n"
             f"⚡ After approval: Gold instantly credited\n\n"
             f"Select package:"
             if lang == "en" else
@@ -2773,7 +2796,7 @@ async def shop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"════════════════════\n\n"
             f"Купи золото через Kaspi Pay (Казахстан):\n\n"
             f"💰 Оплата: перевод Kaspi\n"
-            f"📱 Получатель: +77012345678\n"
+            f"📱 Получатель: {KASPI_PHONE_NUMBER}\n"
             f"⚡ После одобрения: золото мгновенно\n\n"
             f"Выбери пакет:"
         )
@@ -3388,7 +3411,7 @@ async def daily_bonus_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             def slot_box(s1, s2, s3):
                 return (
                     f"╔═════╦═════╦═════╗\n"
-                    f"║ {s1} ║ {s2} ║ {s3} ║\n"
+                    f"║ {s1}  ║ {s2}  ║ {s3}  ║\n"
                     f"╚═════╩═════╩═════╝"
                 )
             

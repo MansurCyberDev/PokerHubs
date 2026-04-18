@@ -4,17 +4,20 @@ import os
 TOKEN = os.getenv("POKER_BOT_TOKEN", "8633427504:AAG-vnFD5raHl1WOxjtBXTKQ_YJTsqYUzDY")
 
 # Вставь сюда свой ID (или несколько через запятую) для админ-прав
-ADMIN_IDS = [5491969475]
+ADMIN_IDS = [int(x.strip()) for x in os.getenv("POKER_ADMIN_IDS", "5491969475").split(",") if x.strip()]
 SUPPORT_USERNAME = os.getenv("POKER_SUPPORT_USERNAME", "")
 
-# Настройки игры
-MIN_PLAYERS = 2
-MAX_PLAYERS = 9
-STARTING_STACK = 1000  # Фишки при старте
-SMALL_BLIND = 10
-BIG_BLIND = 20
-REGISTRATION_TIME = 120  # Секунды на регистрацию
-TURN_TIME = 60  # Секунды на ход (авто-fold)
+# Kaspi Pay configuration
+KASPI_PHONE_NUMBER = os.getenv("KASPI_PHONE_NUMBER", "+77012345678")  # Номер для переводов Kaspi
+
+# Настройки игры (можно переопределить через ENV)
+MIN_PLAYERS = int(os.getenv("POKER_MIN_PLAYERS", "2"))
+MAX_PLAYERS = int(os.getenv("POKER_MAX_PLAYERS", "9"))
+STARTING_STACK = int(os.getenv("POKER_STARTING_STACK", "1000"))  # Фишки при старте
+SMALL_BLIND = int(os.getenv("POKER_SMALL_BLIND", "10"))
+BIG_BLIND = int(os.getenv("POKER_BIG_BLIND", "20"))
+REGISTRATION_TIME = int(os.getenv("POKER_REGISTRATION_TIME", "120"))  # Секунды на регистрацию
+TURN_TIME = int(os.getenv("POKER_TURN_TIME", "60"))  # Секунды на ход (авто-fold)
 
 # Масти и ранги
 SUITS = ['♠', '♥', '♦', '♣']

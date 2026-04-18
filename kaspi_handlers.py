@@ -3,7 +3,7 @@ from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 from handlers import _user_lang
 from keyboards import get_admin_kaspi_panel_keyboard, get_admin_payment_action_keyboard, get_admin_payment_view_keyboard
-from config import SUPPORT_USERNAME
+from config import SUPPORT_USERNAME, KASPI_PHONE_NUMBER
 
 # ==================== KASPI PAY HANDLERS ====================
 
@@ -128,7 +128,7 @@ async def kaspi_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"<b>Инструкция по оплате:</b>\n\n"
             f"1️⃣ Открой приложение Kaspi\n"
             f"2️⃣ Нажми «Переводы»\n"
-            f"3️⃣ Введи номер: <code>+77012345678</code>\n"
+            f"3️⃣ Введи номер: <code>{KASPI_PHONE_NUMBER}</code>\n"
             f"4️⃣ Укажи сумму: <b>{amount_kzt} ₸</b>\n"
             f"5️⃣ В комментарии напиши:\n"
             f"<code>PAY{payment_id}</code>\n\n"
@@ -143,7 +143,7 @@ async def kaspi_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"<b>Payment Instructions:</b>\n\n"
             f"1️⃣ Open Kaspi app\n"
             f"2️⃣ Tap «Transfers»\n"
-            f"3️⃣ Enter number: <code>+77012345678</code>\n"
+            f"3️⃣ Enter number: <code>{KASPI_PHONE_NUMBER}</code>\n"
             f"4️⃣ Amount: <b>{amount_kzt} ₸</b>\n"
             f"5️⃣ In comment write:\n"
             f"<code>PAY{payment_id}</code>\n\n"

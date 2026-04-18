@@ -1,4 +1,7 @@
 import logging
+import signal
+import sys
+import asyncio
 from telegram import (
     Update, BotCommand,
     BotCommandScopeAllPrivateChats, BotCommandScopeAllGroupChats
@@ -19,11 +22,55 @@ from kaspi_handlers import (
     kaspi_callback, kaspi_receipt_photo_handler, admin_kaspi_callback, admin_kaspi_text_handler, admin_issues_callback
 )
 
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logging.getLogger("httpx").disabled = True
+from logging_config import setup_logging, get_logger
+
+# Setup production logging
+logger = setup_logging()
+logger = get_logger(__name__)
+
+# Global flag for shutdown
+_shutdown_event = asyncio.Event()
+
+async def graceful_shutdown(application: Application):
+    """Gracefully shutdown the bot, saving state and closing connections."""
+    logger.info("🛑 Shutdown signal received, starting graceful shutdown...")
+    
+    # Stop accepting new updates
+    await application.stop()
+    
+    # Get active games and notify players
+    from game_state import active_games
+    if active_games:
+        logger.info(f"📋 Notifying {len(active_games)} active game(s) about shutdown...")
+        for chat_id, game in list(active_games.items()):
+            try:
+                # Notify players that game will be paused
+                await application.bot.send_message(
+                    chat_id=chat_id,
+                    text="⚠️ <b>Техническое обслуживание</b>\n\n"
+                         "Бот временно останавливается для обновления.\n"
+                         "Игра будет сохранена. Пожалуйста, подождите 1-2 минуты.",
+                    parse_mode="HTML"
+                )
+                logger.info(f"  ✓ Notified game {chat_id}")
+            except Exception as e:
+                logger.warning(f"  ✗ Failed to notify game {chat_id}: {e}")
+    
+    # Give time for final operations to complete
+    await asyncio.sleep(1)
+    
+    logger.info("✅ Graceful shutdown complete")
+    _shutdown_event.set()
+
+def signal_handler(signum, frame):
+    """Handle shutdown signals."""
+    logger.info(f"📡 Received signal {signum}, initiating shutdown...")
+    # Set the shutdown event to signal the main loop
+    asyncio.create_task(_signal_async_shutdown())
+
+async def _signal_async_shutdown():
+    """Bridge between sync signal handler and async shutdown."""
+    _shutdown_event.set()
 
 
 async def post_init(application: Application):
@@ -78,6 +125,10 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 from telegram.error import NetworkError, RetryAfter, TimedOut
 
 def main():
+    # Register signal handlers for graceful shutdown
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+    
     application = Application.builder().token(TOKEN).post_init(post_init).build()
 
     # Глобальный обработчик ошибок
@@ -132,8 +183,7 @@ def main():
         private_text_router
     ))
     
-    # Run with retry logic for network errors
-    import asyncio
+    # Run with retry logic for network errors and graceful shutdown support
     import time
     
     max_retries = 10
@@ -141,20 +191,36 @@ def main():
     
     for attempt in range(max_retries):
         try:
-            print(f"🚀 Starting bot... (attempt {attempt + 1}/{max_retries})")
-            application.run_polling(allowed_updates=Update.ALL_TYPES)
-            break  # If successful, exit loop
+            logger.info(f"🚀 Starting bot... (attempt {attempt + 1}/{max_retries})")
+            
+            # Run polling in a way that can be interrupted
+            async def run_with_shutdown():
+                await application.initialize()
+                await application.start()
+                await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+                
+                logger.info("🤖 Bot is running. Press Ctrl+C to stop.")
+                
+                # Wait for shutdown signal
+                await _shutdown_event.wait()
+                
+                # Perform graceful shutdown
+                await graceful_shutdown(application)
+            
+            asyncio.run(run_with_shutdown())
+            break  # If we get here, shutdown was graceful
+            
         except NetworkError as e:
-            print(f"⚠️ Network error: {e}")
+            logger.warning(f"⚠️ Network error: {e}")
             if attempt < max_retries - 1:
-                print(f"⏳ Retrying in {retry_delay} seconds...")
+                logger.info(f"⏳ Retrying in {retry_delay} seconds...")
                 time.sleep(retry_delay)
                 retry_delay = min(retry_delay * 2, 60)  # Exponential backoff, max 60s
             else:
-                print("❌ Max retries reached. Please check your internet connection.")
+                logger.error("❌ Max retries reached. Please check your internet connection.")
                 raise
         except Exception as e:
-            print(f"❌ Unexpected error: {e}")
+            logger.error(f"❌ Unexpected error: {e}")
             raise
 
 
