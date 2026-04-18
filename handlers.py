@@ -1988,6 +1988,7 @@ def _admin_help_text() -> str:
     return (
         "🛠 <b>Админ-панель (команды)</b>\n\n"
         "<code>/admin kaspi</code> — панель платежей Kaspi\n"
+        "<code>/admin health</code> — проверить статус бота\n"
         "<code>/admin add_coins user_id amount</code> — добавить фишки\n"
         "<code>/admin remove_coins user_id amount</code> — убавить фишки\n"
         "<code>/admin add_gold user_id amount</code> — выдать донатное золото\n"
@@ -2026,6 +2027,14 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=get_admin_kaspi_panel_keyboard("ru"),
             parse_mode=ParseMode.HTML
         )
+        return
+    
+    if cmd == "health":
+        from health_check import get_health_monitor
+        health_monitor = get_health_monitor()
+        status = await health_monitor.get_status()
+        text = health_monitor.format_status_message(status)
+        await update.message.reply_text(text, parse_mode=ParseMode.HTML)
         return
     
     # Special case: give_all_skins can work with just user_id (no value needed)
