@@ -183,45 +183,103 @@ def main():
         private_text_router
     ))
     
-    # Run with retry logic for network errors and graceful shutdown support
-    import time
+    # Check if webhook mode is enabled
+    use_webhook = os.getenv("USE_WEBHOOK", "false").lower() == "true"
+    webhook_url = os.getenv("WEBHOOK_URL", "")
+    webhook_host = os.getenv("WEBHOOK_HOST", "0.0.0.0")
+    webhook_port = int(os.getenv("WEBHOOK_PORT", "8080"))
     
-    max_retries = 10
-    retry_delay = 5
-    
-    for attempt in range(max_retries):
-        try:
-            logger.info(f"🚀 Starting bot... (attempt {attempt + 1}/{max_retries})")
+    if use_webhook and webhook_url:
+        # Webhook mode (for production with reverse proxy)
+        logger.info(f"🚀 Starting bot in WEBHOOK mode...")
+        logger.info(f"   Webhook URL: {webhook_url}")
+        
+        async def run_webhook():
+            from webhook_server import setup_webhook, remove_webhook
+            from game_persistence import save_all_active_games, restore_saved_games, GamePersistence
             
-            # Run polling in a way that can be interrupted
-            async def run_with_shutdown():
-                await application.initialize()
-                await application.start()
-                await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
-                
-                logger.info("🤖 Bot is running. Press Ctrl+C to stop.")
-                
-                # Wait for shutdown signal
-                await _shutdown_event.wait()
-                
-                # Perform graceful shutdown
-                await graceful_shutdown(application)
+            await application.initialize()
+            await application.start()
             
-            asyncio.run(run_with_shutdown())
-            break  # If we get here, shutdown was graceful
+            # Initialize game persistence tables
+            await GamePersistence.init_tables()
             
-        except NetworkError as e:
-            logger.warning(f"⚠️ Network error: {e}")
-            if attempt < max_retries - 1:
-                logger.info(f"⏳ Retrying in {retry_delay} seconds...")
-                time.sleep(retry_delay)
-                retry_delay = min(retry_delay * 2, 60)  # Exponential backoff, max 60s
-            else:
-                logger.error("❌ Max retries reached. Please check your internet connection.")
+            # Restore saved games on startup
+            await restore_saved_games()
+            
+            # Setup webhook
+            server = await setup_webhook(
+                application,
+                webhook_url=webhook_url,
+                host=webhook_host,
+                port=webhook_port
+            )
+            
+            logger.info("🤖 Bot is running in webhook mode. Send SIGTERM to stop.")
+            
+            # Wait for shutdown
+            await _shutdown_event.wait()
+            
+            # Graceful shutdown
+            logger.info("🛑 Saving games before shutdown...")
+            await save_all_active_games()
+            await server.stop()
+            await remove_webhook(application)
+            await graceful_shutdown(application)
+        
+        asyncio.run(run_webhook())
+    else:
+        # Polling mode (default, for development)
+        logger.info(f"🚀 Starting bot in POLLING mode...")
+        
+        import time
+        max_retries = 10
+        retry_delay = 5
+        
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"   Attempt {attempt + 1}/{max_retries}")
+                
+                async def run_polling():
+                    from game_persistence import save_all_active_games, restore_saved_games, GamePersistence
+                    
+                    await application.initialize()
+                    await application.start()
+                    await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+                    
+                    # Initialize game persistence tables
+                    await GamePersistence.init_tables()
+                    
+                    # Restore saved games on startup
+                    await restore_saved_games()
+                    
+                    logger.info("🤖 Bot is running. Press Ctrl+C to stop.")
+                    
+                    # Wait for shutdown signal
+                    await _shutdown_event.wait()
+                    
+                    # Save games before shutdown
+                    logger.info("🛑 Saving games before shutdown...")
+                    await save_all_active_games()
+                    
+                    # Perform graceful shutdown
+                    await graceful_shutdown(application)
+                
+                asyncio.run(run_polling())
+                break  # If we get here, shutdown was graceful
+                
+            except NetworkError as e:
+                logger.warning(f"⚠️ Network error: {e}")
+                if attempt < max_retries - 1:
+                    logger.info(f"⏳ Retrying in {retry_delay} seconds...")
+                    time.sleep(retry_delay)
+                    retry_delay = min(retry_delay * 2, 60)
+                else:
+                    logger.error("❌ Max retries reached.")
+                    raise
+            except Exception as e:
+                logger.error(f"❌ Unexpected error: {e}")
                 raise
-        except Exception as e:
-            logger.error(f"❌ Unexpected error: {e}")
-            raise
 
 
 if __name__ == "__main__":
