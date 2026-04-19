@@ -1,6 +1,4 @@
 import logging
-import signal
-import sys
 import asyncio
 from telegram import (
     Update, BotCommand,
@@ -22,42 +20,8 @@ from kaspi_handlers import (
     kaspi_callback, kaspi_receipt_photo_handler, admin_kaspi_callback, admin_kaspi_text_handler, admin_issues_callback
 )
 
-from logging_config import setup_logging, get_logger
-
-# Setup production logging
-logger = setup_logging()
-logger = get_logger(__name__)
-
-# Global flag for shutdown
-_shutdown_event = asyncio.Event()
-
-async def graceful_shutdown(application: Application):
-    """Gracefully shutdown the bot, saving state and closing connections."""
-    logger.info("🛑 Shutdown signal received, starting graceful shutdown...")
-    
-    # Stop accepting new updates
-    await application.stop()
-    
-    # Get active games and notify players
-    from game_state import active_games
-    if active_games:
-        logger.info(f"📋 Notifying {len(active_games)} active game(s) about shutdown...")
-        for chat_id, game in list(active_games.items()):
-            try:
-                # Notify players that game will be paused
-                await application.bot.send_message(
-                    chat_id=chat_id,
-                    text="⚠️ <b>Техническое обслуживание</b>\n\n"
-                         "Бот временно останавливается для обновления.\n"
-                         "Игра будет сохранена. Пожалуйста, подождите 1-2 минуты.",
-                    parse_mode="HTML"
-                )
-                logger.info(f"  ✓ Notified game {chat_id}")
-            except Exception as e:
-                logger.warning(f"  ✗ Failed to notify game {chat_id}: {e}")
-    
-    # Give time for final operations to complete
-    await asyncio.sleep(1)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
     
     logger.info("✅ Graceful shutdown complete")
     _shutdown_event.set()
