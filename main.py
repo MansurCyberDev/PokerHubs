@@ -20,9 +20,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def main():
+async def main():
     # Initialize database
-    init_db()
+    await init_db()
     
     # Create application
     application = Application.builder().token(TOKEN).build()
@@ -75,4 +75,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    import asyncio
+    asyncio.run(main())
