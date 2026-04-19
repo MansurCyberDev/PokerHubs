@@ -455,20 +455,6 @@ async def admin_kaspi_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         
         await query.edit_message_text(text, parse_mode=ParseMode.HTML)
-        
-    elif data.startswith("admin_approve_comment_"):
-        payment_id = int(data.split("_")[-1])
-        context.user_data['approving_payment'] = payment_id
-        
-        text = (
-            "📝 Введи комментарий к одобрению:\n"
-            "(или напиши 'ок')"
-        ) if not is_en else (
-            "📝 Enter approval comment:\n"
-            "(or type 'ok')"
-        )
-        
-        await query.edit_message_text(text, parse_mode=ParseMode.HTML)
 
 
 async def show_payment_to_admin(query, payment: dict, lang: str):
@@ -596,7 +582,12 @@ async def process_payment_approval(update: Update, context: ContextTypes.DEFAULT
             f"Thank you for your purchase! 🎉"
         )
         
+        # Add comment if provided
+        if comment and comment.strip() and comment.lower() not in ["ок", "ok"]:
+            text += f"\n\n💬 Комментарий: {comment}"
+        
         await context.bot.send_message(user_id, text, parse_mode=ParseMode.HTML)
+        print(f"✅ User {user_id} notified about approval of payment #{payment_id}")
     except Exception as e:
         print(f"Failed to notify user {user_id}: {e}")
     
@@ -672,15 +663,18 @@ async def process_payment_rejection(update: Update, context: ContextTypes.DEFAUL
     # Notify user about rejection
     user_notified = False
     try:
+        # Handle "no comment" case
+        display_reason = reason if reason and reason.strip() and reason.lower() not in ["без комментария", "no comment"] else "Не указана" if lang != "en" else "Not specified"
+        
         text = (
             f"❌ <b>ПЛАТЕЖ ОТКЛОНЕН</b>\n\n"
             f"Заявка #{payment_id}\n\n"
-            f"Причина: <b>{reason}</b>\n\n"
+            f"Причина: <b>{display_reason}</b>\n\n"
             f"Если есть вопросы — напиши @{SUPPORT_USERNAME or 'admin'}"
         ) if lang != "en" else (
             f"❌ <b>PAYMENT REJECTED</b>\n\n"
             f"Payment #{payment_id}\n\n"
-            f"Reason: <b>{reason}</b>\n\n"
+            f"Reason: <b>{display_reason}</b>\n\n"
             f"If you have questions — contact @{SUPPORT_USERNAME or 'admin'}"
         )
         
@@ -774,12 +768,6 @@ async def admin_kaspi_text_handler(update: Update, context: ContextTypes.DEFAULT
     if 'rejecting_payment' in context.user_data:
         payment_id = context.user_data.pop('rejecting_payment')
         await process_payment_rejection(update, context, payment_id, text, lang)
-        return
-    
-    # Check if admin is approving with comment
-    if 'approving_payment' in context.user_data:
-        payment_id = context.user_data.pop('approving_payment')
-        await process_payment_approval(update, context, payment_id, text, lang)
         return
     
     # Check if admin is replying to an issue

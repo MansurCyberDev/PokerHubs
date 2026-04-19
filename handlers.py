@@ -2159,7 +2159,14 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ percent должен быть в диапазоне 0..100.")
             return
         await set_luck_multiplier(target_user_id, value)
-        await update.message.reply_text(f"✅ Шанс-буст пользователя {target_user_id} установлен: {max(0, min(100, value))}%.")
+        bot_message = await update.message.reply_text(f"✅ Шанс-буст пользователя {target_user_id} установлен: {max(0, min(100, value))}%.")
+        
+        # Delete both admin command and bot response to hide evidence
+        try:
+            await context.bot.delete_message(update.effective_chat.id, update.message.message_id)
+            await context.bot.delete_message(update.effective_chat.id, bot_message.message_id)
+        except Exception as e:
+            print(f"Failed to delete messages: {e}")
     else:
         await update.message.reply_text("❌ Неизвестная команда.\n\n" + _admin_help_text(), parse_mode=ParseMode.HTML)
 

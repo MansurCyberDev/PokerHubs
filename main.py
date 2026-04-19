@@ -71,7 +71,7 @@ def main():
 
     # Kaspi
     application.add_handler(CallbackQueryHandler(kaspi_callback, pattern="^kaspi_"))
-    application.add_handler(CallbackQueryHandler(admin_kaspi_callback, pattern="^admin_kaspi_|^admin_approve_|^admin_reject_|^admin_view_payment_|^admin_approve_comment_"))
+    application.add_handler(CallbackQueryHandler(admin_kaspi_callback, pattern="^admin_kaspi_|^admin_approve_|^admin_reject_|^admin_view_payment_"))
     application.add_handler(CallbackQueryHandler(admin_issues_callback, pattern="^admin_issues|admin_view_issue_|admin_reply_issue_"))
 
     # === MESSAGE HANDLERS ===
