@@ -1,0 +1,4 @@
+2026-04-19 19:06:10 - __main__ - ERROR - [main.py:312] - ❌ Configuration errors:
+2026-04-19 19:06:10 - __main__ - ERROR - [main.py:314] -    - POKER_ADMIN_IDS not set!
+2026-04-19 19:06:10 - __main__ - ERROR - [main.py:315] - 
+Set these in Railway Dashboard → Variables
