@@ -951,10 +951,38 @@ async def notify_turn(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
 async def action_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-
+    
     user = update.effective_user
-    lang = await _user_lang(user.id)
-    chat_id = update.effective_chat.id
+    data = query.data
+    
+    # Handle all-in confirmation/cancellation
+    if data == "confirm_all_in":
+        chat_id = context.user_data.get('active_game_id')
+        if not chat_id:
+            return
+        game = active_games.get(chat_id)
+        if not game or game.current_player_idx >= len(game.players):
+            return
+        current_player = game.players[game.current_player_idx]
+        if current_player.user_id != user.id:
+            return
+        await clear_dm_ui(context, user.id, remove_prompt=True, remove_bet_prompt=True, remove_hand=True)
+        await process_action(context, chat_id, "all_in", 0)
+        await maybe_restore_private_menu(context, user.id, chat_id)
+        return
+    
+    if data == "cancel_all_in":
+        # Just refresh the turn UI without action
+        chat_id = context.user_data.get('active_game_id')
+        if chat_id:
+            await notify_turn(context, chat_id)
+        return
+    
+    chat_id = int(data.split("_")[-1])
+    
+    game = active_games.get(chat_id)
+    if not game:
+        return
     
     # Если нажато в ЛС, берем сохраненный ID чата игры
     if update.effective_chat.type == "private":
@@ -985,7 +1013,40 @@ async def action_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     game._processing_action = True
     try:
-        if data in ["fold", "check", "call", "all_in"]:
+        if data == "all_in":
+            # All-in protection: show confirmation for large bets (> 50% of stack)
+            player = game.players[game.current_player_idx]
+            if player.stack > 500:  # Protection threshold
+                await query.answer()
+                lang = await _user_lang(user.id)
+                text = (
+                    f"🔥 <b>ПОДТВЕРДИ ALL-IN</b>\n"
+                    f"════════════════════\n\n"
+                    f"Ты собираешься поставить <b>{player.stack}</b> фишек!\n\n"
+                    f"Это больше 50% твоего стека.\n"
+                    f"Уверен?"
+                    if lang != "en" else
+                    f"🔥 <b>CONFIRM ALL-IN</b>\n"
+                    f"════════════════════\n\n"
+                    f"You're about to bet <b>{player.stack}</b> chips!\n\n"
+                    f"This is more than 50% of your stack.\n"
+                    f"Are you sure?"
+                )
+                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                keyboard = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("✅ Да, all-in" if lang != "en" else "✅ Yes, all-in", callback_data="confirm_all_in"),
+                        InlineKeyboardButton("❌ Отмена" if lang != "en" else "❌ Cancel", callback_data="cancel_all_in")
+                    ]
+                ])
+                await query.edit_message_text(text, reply_markup=keyboard, parse_mode="HTML")
+                return
+            else:
+                # Small stack - no confirmation needed
+                await clear_dm_ui(context, user.id, remove_prompt=True, remove_bet_prompt=True, remove_hand=True)
+                await process_action(context, chat_id, data, 0)
+                await maybe_restore_private_menu(context, user.id, chat_id)
+        elif data in ["fold", "check", "call"]:
             await clear_dm_ui(context, user.id, remove_prompt=True, remove_bet_prompt=True, remove_hand=True)
             await process_action(context, chat_id, data, 0)
             await maybe_restore_private_menu(context, user.id, chat_id)

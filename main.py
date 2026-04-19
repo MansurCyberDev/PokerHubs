@@ -46,6 +46,7 @@ def main():
     application.add_handler(CallbackQueryHandler(join_callback, pattern="^join_game$"))
     application.add_handler(CallbackQueryHandler(start_early_callback, pattern="^start_early$"))
     application.add_handler(CallbackQueryHandler(action_callback, pattern="^action_"))
+    application.add_handler(CallbackQueryHandler(action_callback, pattern="^(confirm_all_in|cancel_all_in)$"))
     application.add_handler(CallbackQueryHandler(bet_amount_callback, pattern="^bet_amount_"))
     application.add_handler(CallbackQueryHandler(new_game_callback, pattern="^new_game$"))
     application.add_handler(CallbackQueryHandler(game_settings_callback, pattern="^(set_blinds|set_seats)$"))
