@@ -1969,19 +1969,20 @@ async def issue_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Admin will reply as soon as possible.\n\n"
             f"Thank you for your feedback! 🙏"
         )
+        await update.message.reply_text(confirm_text, parse_mode=ParseMode.HTML)
+        
     except Exception as e:
         print(f"Failed to save issue: {e}")
         import traceback
         traceback.print_exc()
-        confirm_text = (
+        error_text = (
             f"⚠️ <b>Не удалось отправить сообщение</b>\n\n"
             f"Попробуйте позже или свяжитесь напрямую: @{SUPPORT_USERNAME or 'admin'}"
             if lang != "en" else
             f"⚠️ <b>Failed to send message</b>\n\n"
             f"Please try again later or contact directly: @{SUPPORT_USERNAME or 'admin'}"
         )
-    
-    await update.message.reply_text(confirm_text, parse_mode=ParseMode.HTML)
+        await update.message.reply_text(error_text, parse_mode=ParseMode.HTML)
 
 
 async def language_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
