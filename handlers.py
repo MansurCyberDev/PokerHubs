@@ -2426,6 +2426,22 @@ async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     await ban_user(target_user_id, reason, user.id)
+    
+    # Notify banned user
+    try:
+        ban_message = (
+            f"🚫 <b>Вы забанены в PokerHubs</b>\n"
+            f"════════════════════\n\n"
+            f"Причина: {reason or 'Нарушение правил'}\n\n"
+            f"Вы больше не можете:\n"
+            f"• Присоединяться к играм\n"
+            f"• Играть за столами\n\n"
+            f"Для разбана обратитесь к администрации: {SUPPORT_USERNAME}"
+        )
+        await context.bot.send_message(target_user_id, ban_message, parse_mode="HTML")
+    except Exception:
+        pass  # User may have blocked bot
+    
     await update.message.reply_text(f"✅ Пользователь {target_user_id} забанен.\nПричина: {reason or 'не указана'}")
 
 
@@ -2453,6 +2469,22 @@ async def unban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     await unban_user(target_user_id)
+    
+    # Notify unbanned user
+    try:
+        unban_message = (
+            f"✅ <b>Вы разбанены в PokerHubs</b>\n"
+            f"════════════════════\n\n"
+            f"Добро пожаловать обратно!\n\n"
+            f"Теперь ты снова можешь:\n"
+            f"• Присоединяться к играм\n"
+            f"• Играть за столами\n\n"
+            f"Соблюдай правила и удачи за столом! 🍀"
+        )
+        await context.bot.send_message(target_user_id, unban_message, parse_mode="HTML")
+    except Exception:
+        pass  # User may have blocked bot
+    
     await update.message.reply_text(f"✅ Пользователь {target_user_id} разбанен.")
 
 
