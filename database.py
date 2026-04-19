@@ -10,6 +10,99 @@ from skins import SKINS, TABLE_SKINS
 DB_NAME = "poker_stats.db"
 
 
+async def ban_user(user_id: int, reason: str = "", banned_by: int = None) -> bool:
+    """Ban a user from playing."""
+    async with aiosqlite.connect(DB_NAME) as db:
+        await db.execute('''
+            INSERT OR REPLACE INTO banned_users (user_id, reason, banned_by, banned_at)
+            VALUES (?, ?, ?, ?)
+        ''', (user_id, reason, banned_by, datetime.now().isoformat()))
+        await db.commit()
+        return True
+
+
+async def unban_user(user_id: int) -> bool:
+    """Unban a user."""
+    async with aiosqlite.connect(DB_NAME) as db:
+        await db.execute('DELETE FROM banned_users WHERE user_id = ?', (user_id,))
+        await db.commit()
+        return True
+
+
+async def is_user_banned(user_id: int) -> bool:
+    """Check if user is banned."""
+    async with aiosqlite.connect(DB_NAME) as db:
+        async with db.execute('SELECT 1 FROM banned_users WHERE user_id = ?', (user_id,)) as cursor:
+            return await cursor.fetchone() is not None
+
+
+async def find_user_by_username(username: str) -> Optional[dict]:
+    """Find user by username (case insensitive)."""
+    async with aiosqlite.connect(DB_NAME) as db:
+        async with db.execute(
+            'SELECT user_id, username, first_name FROM users WHERE LOWER(username) = LOWER(?)',
+            (username,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            if row:
+                return {'user_id': row[0], 'username': row[1], 'first_name': row[2]}
+            return None
+
+
+async def get_user_full_report(user_id: int) -> Optional[dict]:
+    """Get full user report including stats and history."""
+    async with aiosqlite.connect(DB_NAME) as db:
+        # Get user info
+        async with db.execute(
+            'SELECT user_id, username, first_name, gold, chips FROM users WHERE user_id = ?',
+            (user_id,)
+        ) as cursor:
+            user_row = await cursor.fetchone()
+            if not user_row:
+                return None
+        
+        # Get stats
+        async with db.execute(
+            'SELECT games_played, wins, total_winnings, biggest_win FROM user_stats WHERE user_id = ?',
+            (user_id,)
+        ) as cursor:
+            stats_row = await cursor.fetchone()
+        
+        # Get games count today
+        today = datetime.now().strftime('%Y-%m-%d')
+        async with db.execute(
+            'SELECT COUNT(*) FROM game_history WHERE user_id = ? AND date(played_at) = date(?)',
+            (user_id, today)
+        ) as cursor:
+            games_today = (await cursor.fetchone())[0]
+        
+        # Get ban status
+        is_banned = await is_user_banned(user_id)
+        
+        return {
+            'user_id': user_row[0],
+            'username': user_row[1],
+            'first_name': user_row[2],
+            'gold': user_row[3],
+            'chips': user_row[4],
+            'games_played': stats_row[0] if stats_row else 0,
+            'wins': stats_row[1] if stats_row else 0,
+            'total_winnings': stats_row[2] if stats_row else 0,
+            'biggest_win': stats_row[3] if stats_row else 0,
+            'games_today': games_today,
+            'is_banned': is_banned,
+            'win_rate': round((stats_row[1] / stats_row[0] * 100), 1) if stats_row and stats_row[0] > 0 else 0
+        }
+
+
+async def get_all_user_ids() -> List[int]:
+    """Get all user IDs for broadcast."""
+    async with aiosqlite.connect(DB_NAME) as db:
+        async with db.execute('SELECT user_id FROM users') as cursor:
+            rows = await cursor.fetchall()
+            return [row[0] for row in rows]
+
+
 async def init_db():
     """Инициализация базы данных"""
     async with aiosqlite.connect(DB_NAME) as db:
@@ -88,6 +181,15 @@ async def init_db():
                 created_at TEXT,
                 replied_at TEXT,
                 replied_by INTEGER
+            )
+        ''')
+
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS banned_users (
+                user_id INTEGER PRIMARY KEY,
+                reason TEXT,
+                banned_by INTEGER,
+                banned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
 

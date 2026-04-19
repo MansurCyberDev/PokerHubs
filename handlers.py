@@ -620,6 +620,12 @@ async def join_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     game = active_games[chat_id]
 
+    # Check if user is banned
+    from database import is_user_banned
+    if await is_user_banned(user.id):
+        await query.answer("🚫 Ты забанен и не можешь играть.", show_alert=True)
+        return
+
     if game.phase != GamePhase.WAITING:
         await query.answer("Игра уже началась!", show_alert=True)
         return
@@ -2390,6 +2396,168 @@ async def private_text_router(update: Update, context: ContextTypes.DEFAULT_TYPE
         await custom_raise_handler(update, context)
         return
     await text_menu_handler(update, context)
+
+
+# ==================== ADMIN COMMANDS ====================
+
+async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Ban a user from playing."""
+    user = update.effective_user
+    if not _is_admin(user.id):
+        await update.message.reply_text("⛔ Нет прав.")
+        return
+    
+    args = context.args or []
+    if not args:
+        await update.message.reply_text("❌ Использование: /ban <user_id> [причина]")
+        return
+    
+    try:
+        target_user_id = int(args[0])
+    except ValueError:
+        await update.message.reply_text("❌ user_id должен быть числом.")
+        return
+    
+    reason = " ".join(args[1:]) if len(args) > 1 else ""
+    
+    from database import ban_user, is_user_banned
+    if await is_user_banned(target_user_id):
+        await update.message.reply_text(f"⚠️ Пользователь {target_user_id} уже забанен.")
+        return
+    
+    await ban_user(target_user_id, reason, user.id)
+    await update.message.reply_text(f"✅ Пользователь {target_user_id} забанен.\nПричина: {reason or 'не указана'}")
+
+
+async def unban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Unban a user."""
+    user = update.effective_user
+    if not _is_admin(user.id):
+        await update.message.reply_text("⛔ Нет прав.")
+        return
+    
+    args = context.args or []
+    if not args:
+        await update.message.reply_text("❌ Использование: /unban <user_id>")
+        return
+    
+    try:
+        target_user_id = int(args[0])
+    except ValueError:
+        await update.message.reply_text("❌ user_id должен быть числом.")
+        return
+    
+    from database import unban_user, is_user_banned
+    if not await is_user_banned(target_user_id):
+        await update.message.reply_text(f"⚠️ Пользователь {target_user_id} не был забанен.")
+        return
+    
+    await unban_user(target_user_id)
+    await update.message.reply_text(f"✅ Пользователь {target_user_id} разбанен.")
+
+
+async def finduser_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Find user by username."""
+    user = update.effective_user
+    if not _is_admin(user.id):
+        await update.message.reply_text("⛔ Нет прав.")
+        return
+    
+    args = context.args or []
+    if not args:
+        await update.message.reply_text("❌ Использование: /finduser @username")
+        return
+    
+    username = args[0].lstrip('@')
+    from database import find_user_by_username
+    user_info = await find_user_by_username(username)
+    
+    if not user_info:
+        await update.message.reply_text(f"❌ Пользователь @{username} не найден.")
+        return
+    
+    text = (
+        f"👤 <b>Найден пользователь</b>\n"
+        f"════════════════════\n"
+        f"ID: <code>{user_info['user_id']}</code>\n"
+        f"Username: @{user_info['username'] or 'нет'}\n"
+        f"Имя: {user_info['first_name'] or 'нет'}"
+    )
+    await update.message.reply_text(text, parse_mode=ParseMode.HTML)
+
+
+async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Broadcast message to all users."""
+    user = update.effective_user
+    if not _is_admin(user.id):
+        await update.message.reply_text("⛔ Нет прав.")
+        return
+    
+    args = context.args or []
+    if not args:
+        await update.message.reply_text("❌ Использование: /broadcast <текст сообщения>")
+        return
+    
+    message = " ".join(args)
+    from database import get_all_user_ids
+    user_ids = await get_all_user_ids()
+    
+    sent = 0
+    failed = 0
+    for uid in user_ids:
+        try:
+            await context.bot.send_message(uid, f"📢 <b>Сообщение от администрации</b>\n\n{message}", parse_mode=ParseMode.HTML)
+            sent += 1
+        except Exception:
+            failed += 1
+    
+    await update.message.reply_text(f"✅ Рассылка завершена:\n📤 Отправлено: {sent}\n❌ Ошибок: {failed}")
+
+
+async def checkuser_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Get full user report."""
+    user = update.effective_user
+    if not _is_admin(user.id):
+        await update.message.reply_text("⛔ Нет прав.")
+        return
+    
+    args = context.args or []
+    if not args:
+        await update.message.reply_text("❌ Использование: /checkuser <user_id>")
+        return
+    
+    try:
+        target_user_id = int(args[0])
+    except ValueError:
+        await update.message.reply_text("❌ user_id должен быть числом.")
+        return
+    
+    from database import get_user_full_report
+    report = await get_user_full_report(target_user_id)
+    
+    if not report:
+        await update.message.reply_text(f"❌ Пользователь {target_user_id} не найден.")
+        return
+    
+    ban_status = "🚫 ЗАБАНЕН" if report['is_banned'] else "✅ Активен"
+    text = (
+        f"📊 <b>ОТЧЁТ ПО ПОЛЬЗОВАТЕЛЮ</b>\n"
+        f"════════════════════\n\n"
+        f"👤 ID: <code>{report['user_id']}</code>\n"
+        f"Username: @{report['username'] or 'нет'}\n"
+        f"Имя: {report['first_name'] or 'нет'}\n"
+        f"Статус: {ban_status}\n\n"
+        f"💰 Баланс:\n"
+        f"  Золото: {report['gold']}\n"
+        f"  Фишки: {report['chips']}\n\n"
+        f"📈 Статистика:\n"
+        f"  Игр: {report['games_played']}\n"
+        f"  Побед: {report['wins']} ({report['win_rate']}%)\n"
+        f"  Всего выиграно: {report['total_winnings']}\n"
+        f"  Лучший выигрыш: {report['biggest_win']}\n"
+        f"  Сегодня игр: {report['games_today']}"
+    )
+    await update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
 
 async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):

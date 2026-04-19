@@ -10,7 +10,8 @@ from handlers import (
     menu_callback, shop_callback, gold_buy_callback, chips_ad_callback, language_callback, daily_bonus_callback,
     help_command, private_text_router, language_command, leave_command, rules_command, issue_command,
     game_settings_callback, game_settings_value_callback, admin_command,
-    inventory_command, inventory_callback, shop_command
+    inventory_command, inventory_callback, shop_command,
+    ban_command, unban_command, finduser_command, broadcast_command, checkuser_command
 )
 from kaspi_handlers import (
     kaspi_callback, kaspi_receipt_photo_handler, admin_kaspi_callback, admin_kaspi_text_handler, admin_issues_callback
@@ -40,6 +41,13 @@ def main():
     application.add_handler(CommandHandler("issue", issue_command))
     application.add_handler(CommandHandler("admin", admin_command))
     application.add_handler(CommandHandler("shop", shop_command))
+    
+    # === ADMIN COMMANDS ===
+    application.add_handler(CommandHandler("ban", ban_command))
+    application.add_handler(CommandHandler("unban", unban_command))
+    application.add_handler(CommandHandler("finduser", finduser_command))
+    application.add_handler(CommandHandler("broadcast", broadcast_command))
+    application.add_handler(CommandHandler("checkuser", checkuser_command))
 
     # === CALLBACKS ===
     # Game
