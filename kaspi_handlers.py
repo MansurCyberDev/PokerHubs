@@ -348,34 +348,42 @@ async def admin_kaspi_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     is_en = lang == "en"
     
     if data == "admin_kaspi_pending":
-        # Show pending payments list
-        from database import get_pending_payments
+        # Show all payments list (pending first, then reviewed)
+        from database import get_all_payments
         from keyboards import get_admin_pending_list_keyboard
-        pending = await get_pending_payments()
+        all_payments = await get_all_payments()
         
-        if not pending:
+        if not all_payments:
             await query.edit_message_text(
-                "✅ Нет ожидающих заявок" if not is_en else "✅ No pending payments",
+                "✅ Нет заявок" if not is_en else "✅ No payments",
                 reply_markup=get_admin_kaspi_panel_keyboard(lang)
             )
             return
         
-        # Show list of pending payments as buttons
+        # Count pending vs reviewed
+        pending_count = sum(1 for p in all_payments if p['status'] == 'pending')
+        reviewed_count = len(all_payments) - pending_count
+        
+        # Show list of all payments as buttons
         text = (
-            f"📋 <b>ОЖИДАЮЩИЕ ЗАЯВКИ</b>\n"
+            f"📋 <b>ВСЕ ЗАЯВКИ</b>\n"
             f"════════════════════\n\n"
-            f"Всего: <b>{len(pending)}</b>\n\n"
+            f"⏳ Ожидают: <b>{pending_count}</b>\n"
+            f"✅ Рассмотрено: <b>{reviewed_count}</b>\n"
+            f"📊 Всего: <b>{len(all_payments)}</b>\n\n"
             f"Выберите заявку для просмотра:"
             if not is_en else
-            f"📋 <b>PENDING PAYMENTS</b>\n"
+            f"📋 <b>ALL PAYMENTS</b>\n"
             f"════════════════════\n\n"
-            f"Total: <b>{len(pending)}</b>\n\n"
+            f"⏳ Pending: <b>{pending_count}</b>\n"
+            f"✅ Reviewed: <b>{reviewed_count}</b>\n"
+            f"📊 Total: <b>{len(all_payments)}</b>\n\n"
             f"Select a payment to view:"
         )
         
         await query.edit_message_text(
             text,
-            reply_markup=get_admin_pending_list_keyboard(pending, lang),
+            reply_markup=get_admin_pending_list_keyboard(all_payments, lang),
             parse_mode=ParseMode.HTML
         )
         
@@ -615,29 +623,29 @@ async def process_payment_approval(update: Update, context: ContextTypes.DEFAULT
                 print(f"Failed to delete receipt photo: {e}")
         del context.user_data['payment_messages'][payment_id]
     
-    # Show confirmation and return to pending list
-    from database import get_pending_payments
-    pending = await get_pending_payments()
+    # Show confirmation and return to payments list
+    from database import get_all_payments
+    all_payments = await get_all_payments()
     
-    if pending:
+    if all_payments:
         text = (
             f"✅ <b>Заявка #{payment_id} одобрена!</b>\n\n"
-            f"📋 Осталось заявок: <b>{len(pending)}</b>\n\n"
+            f"📋 Всего заявок: <b>{len(all_payments)}</b>\n\n"
             f"Выберите следующую заявку:"
             if lang != "en" else
             f"✅ <b>Payment #{payment_id} approved!</b>\n\n"
-            f"📋 Pending: <b>{len(pending)}</b>\n\n"
+            f"📋 Total payments: <b>{len(all_payments)}</b>\n\n"
             f"Select next payment:"
         )
         from keyboards import get_admin_pending_list_keyboard
         await update.effective_message.reply_text(
             text,
-            reply_markup=get_admin_pending_list_keyboard(pending, lang),
+            reply_markup=get_admin_pending_list_keyboard(all_payments, lang),
             parse_mode=ParseMode.HTML
         )
     else:
         await update.effective_message.reply_text(
-            "✅ Все заявки обработаны!" if lang != "en" else "✅ All payments processed!",
+            "✅ Нет заявок!" if lang != "en" else "✅ No payments!",
             reply_markup=get_admin_kaspi_panel_keyboard(lang)
         )
 
@@ -710,11 +718,11 @@ async def process_payment_rejection(update: Update, context: ContextTypes.DEFAUL
                 print(f"Failed to delete receipt photo: {e}")
         del context.user_data['payment_messages'][payment_id]
     
-    # Show confirmation and return to pending list
-    from database import get_pending_payments
-    pending = await get_pending_payments()
+    # Show confirmation and return to payments list
+    from database import get_all_payments
+    all_payments = await get_all_payments()
     
-    if pending:
+    if all_payments:
         # Build confirmation message with user notification status
         user_notification_status = (
             "✅ Пользователь уведомлен" if user_notified else "⚠️ Не удалось уведомить пользователя"
@@ -725,18 +733,18 @@ async def process_payment_rejection(update: Update, context: ContextTypes.DEFAUL
         text = (
             f"❌ <b>Заявка #{payment_id} отклонена!</b>\n"
             f"{user_notification_status}\n\n"
-            f"📋 Осталось заявок: <b>{len(pending)}</b>\n\n"
+            f"📋 Всего заявок: <b>{len(all_payments)}</b>\n\n"
             f"Выберите следующую заявку:"
             if lang != "en" else
             f"❌ <b>Payment #{payment_id} rejected!</b>\n"
             f"{user_notification_status}\n\n"
-            f"📋 Pending: <b>{len(pending)}</b>\n\n"
+            f"📋 Total payments: <b>{len(all_payments)}</b>\n\n"
             f"Select next payment:"
         )
         from keyboards import get_admin_pending_list_keyboard
         await update.message.reply_text(
             text,
-            reply_markup=get_admin_pending_list_keyboard(pending, lang),
+            reply_markup=get_admin_pending_list_keyboard(all_payments, lang),
             parse_mode=ParseMode.HTML
         )
     else:
@@ -746,8 +754,8 @@ async def process_payment_rejection(update: Update, context: ContextTypes.DEFAUL
             "✅ User notified" if user_notified else "⚠️ Failed to notify user"
         )
         await update.message.reply_text(
-            f"✅ Все заявки обработаны!\n{user_notification_status}" if lang != "en" 
-            else f"✅ All payments processed!\n{user_notification_status}",
+            f"✅ Нет заявок!\n{user_notification_status}" if lang != "en" 
+            else f"✅ No payments!\n{user_notification_status}",
             reply_markup=get_admin_kaspi_panel_keyboard(lang)
         )
 

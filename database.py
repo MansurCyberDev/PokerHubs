@@ -508,6 +508,31 @@ async def get_pending_payments() -> List[Dict]:
             return [dict(row) for row in rows]
 
 
+async def get_all_payments() -> List[Dict]:
+    """Получить все заявки с сортировкой: pending сверху, потом рассмотренные по дате обработки"""
+    async with aiosqlite.connect(DB_NAME) as db:
+        db.row_factory = aiosqlite.Row
+        # Получаем pending заявки
+        async with db.execute('''
+            SELECT * FROM kaspi_payments 
+            WHERE status = 'pending' 
+            ORDER BY created_at DESC
+        ''') as cursor:
+            pending_rows = await cursor.fetchall()
+        
+        # Получаем рассмотренные заявки (approved/rejected)
+        async with db.execute('''
+            SELECT * FROM kaspi_payments 
+            WHERE status IN ('approved', 'rejected') 
+            ORDER BY processed_at DESC
+        ''') as cursor:
+            reviewed_rows = await cursor.fetchall()
+        
+        # Объединяем: сначала pending, потом reviewed
+        all_rows = list(pending_rows) + list(reviewed_rows)
+        return [dict(row) for row in all_rows]
+
+
 async def get_user_payments(user_id: int, limit: int = 10) -> List[Dict]:
     """Получить историю платежей пользователя"""
     async with aiosqlite.connect(DB_NAME) as db:

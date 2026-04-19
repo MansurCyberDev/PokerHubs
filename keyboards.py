@@ -454,18 +454,32 @@ def get_admin_payment_view_keyboard(payment_id: int, lang: str = "ru") -> Inline
 
 
 def get_admin_pending_list_keyboard(pending_payments: list, lang: str = "ru") -> InlineKeyboardMarkup:
-    """Клавиатура списка ожидающих заявок для админа."""
+    """Клавиатура списка заявок для админа с отображением статуса."""
     is_en = lang == "en"
     keyboard = []
     
+    status_emoji = {
+        'pending': '⏳',
+        'approved': '✅',
+        'rejected': '❌'
+    }
+    
     for payment in pending_payments:
         payment_id = payment['id']
+        status = payment.get('status', 'pending')
         item_name = payment.get('item_id', 'Unknown')
         amount_kzt = payment.get('amount_kzt', 0)
         user_name = payment.get('first_name', 'Unknown')
+        emoji = status_emoji.get(status, '⏳')
+        
+        # Mark reviewed payments with different style
+        if status in ['approved', 'rejected']:
+            label = f"{emoji} #{payment_id} ✓ {item_name} ({amount_kzt}₸) — {user_name}"
+        else:
+            label = f"{emoji} #{payment_id} {item_name} ({amount_kzt}₸) — {user_name}"
         
         keyboard.append([InlineKeyboardButton(
-            f"📋 Payment #{payment_id} — {item_name} ({amount_kzt}₸) — {user_name}",
+            label,
             callback_data=f"admin_view_payment_{payment_id}"
         )])
     
