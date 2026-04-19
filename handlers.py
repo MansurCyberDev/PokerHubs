@@ -32,30 +32,6 @@ from utils import (
 from cards import HandEvaluator
 from skins import SKINS, DEFAULT_SKIN, TABLE_SKINS, DEFAULT_TABLE_SKIN
 from config import MIN_PLAYERS, REGISTRATION_TIME, SMALL_BLIND, BIG_BLIND, ADMIN_IDS, SUPPORT_USERNAME, KASPI_PHONE_NUMBER
-from health_check import get_rate_limiter
-
-# Rate limiting decorator
-def rate_limited(func):
-    """Decorator to apply rate limiting to handlers."""
-    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        user_id = update.effective_user.id
-        limiter = get_rate_limiter()
-        
-        # Admins bypass rate limiting
-        if user_id in ADMIN_IDS:
-            return await func(update, context)
-        
-        allowed, message = limiter.is_allowed(user_id)
-        if not allowed:
-            if update.callback_query:
-                await update.callback_query.answer(message, show_alert=True)
-            elif update.message:
-                await update.message.reply_text(message)
-            return
-        
-        return await func(update, context)
-    return wrapper
-
 # user_id -> active game chat_id (для работы кнопок из ЛС)
 user_active_games = {}
 # user_id -> last DM prompt message_id (чтобы удалять старые кнопки)
