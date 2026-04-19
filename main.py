@@ -187,7 +187,8 @@ def main():
     use_webhook = os.getenv("USE_WEBHOOK", "false").lower() == "true"
     webhook_url = os.getenv("WEBHOOK_URL", "")
     webhook_host = os.getenv("WEBHOOK_HOST", "0.0.0.0")
-    webhook_port = int(os.getenv("WEBHOOK_PORT", "8080"))
+    # Railway provides PORT env var, use it if available
+    webhook_port = int(os.getenv("PORT") or os.getenv("WEBHOOK_PORT", "8080"))
     
     if use_webhook and webhook_url:
         # Webhook mode (for production with reverse proxy)
@@ -282,8 +283,48 @@ def main():
                 raise
 
 
-if __name__ == "__main__":
-    if not TOKEN:
-        print("ОШИБКА: POKER_BOT_TOKEN не задан. Укажи его в переменных окружения.")
-        exit(1)
-    main()
+def validate_config():
+    """Validate configuration before starting."""
+    import os
+    errors = []
+    
+    # Check token
+    if not TOKEN or TOKEN == 'your_bot_token_here':
+        errors.append("POKER_BOT_TOKEN not set! Get it from @BotFather")
+    
+    # Check admin IDs
+    admin_ids = os.getenv('POKER_ADMIN_IDS', '')
+    if not admin_ids or admin_ids == 'your_admin_id_here':
+        errors.append("POKER_ADMIN_IDS not set!")
+    
+    # Check webhook config
+    use_webhook = os.getenv('USE_WEBHOOK', 'false').lower() == 'true'
+    if use_webhook:
+        webhook_url = os.getenv('WEBHOOK_URL', '')
+        if not webhook_url:
+            errors.append("USE_WEBHOOK=true but WEBHOOK_URL is empty!")
+        elif not webhook_url.startswith('https://'):
+            errors.append(f"WEBHOOK_URL must start with https:// (got: {webhook_url})")
+        elif not webhook_url.endswith('/webhook'):
+            logger.warning("WEBHOOK_URL should end with /webhook")
+    
+    if errors:
+        logger.error("❌ Configuration errors:")
+        for err in errors:
+            logger.error(f"   - {err}")
+        logger.error("\nSet these in Railway Dashboard → Variables")
+        return False
+    
+    return True
+
+
+if __name__ == '__main__':
+    # Validate before starting
+    if not validate_config():
+        sys.exit(1)
+    
+    try:
+        main()
+    except Exception as e:
+        logger.exception("Fatal error starting bot")
+        sys.exit(1)
