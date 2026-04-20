@@ -1,5 +1,5 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
-from typing import List
+from typing import List, Dict
 
 
 def get_main_menu_keyboard(bot_username: str = "", lang: str = "ru") -> InlineKeyboardMarkup:
