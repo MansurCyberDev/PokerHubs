@@ -2030,27 +2030,61 @@ def _is_admin(user_id: int) -> bool:
 
 def _admin_help_text() -> str:
     return (
-        "🛠 <b>Админ-панель (команды)</b>\n\n"
-        "<code>/admin kaspi</code> — панель платежей Kaspi\n"
-        "<code>/admin health</code> — проверить статус бота\n"
-        "<code>/admin add_coins user_id amount</code> — добавить фишки\n"
-        "<code>/admin remove_coins user_id amount</code> — убавить фишки\n"
-        "<code>/admin add_gold user_id amount</code> — выдать донатное золото\n"
-        "<code>/admin set_luck user_id percent</code> — шанс-буст 0..100%\n"
-        "<code>/admin give_all_skins user_id</code> — выдать все скины\n"
-        "<code>/admin give_all_skins</code> — выдать себе все скины\n\n"
+        "🛠 <b>АДМИН-ПАНЕЛЬ</b>\n"
+        "════════════════════\n\n"
+        "📋 <b>Управление пользователями</b>\n"
+        "<code>/ban user_id [причина]</code> — забанить\n"
+        "<code>/unban user_id</code> — разбанить\n"
+        "<code>/finduser @username</code> — найти по юзернейму\n"
+        "<code>/checkuser user_id</code> — полный отчёт\n"
+        "<code>/broadcast текст</code> — рассылка всем\n\n"
+        "💰 <b>Валюта и ресурсы</b>\n"
+        "<code>/admin add_coins user_id amount</code> — +фишки\n"
+        "<code>/admin remove_coins user_id amount</code> — -фишки\n"
+        "<code>/admin add_gold user_id amount</code> — +золото\n\n"
+        "🎰 <b>Настройки игры</b>\n"
+        "<code>/admin set_luck user_id percent</code> — шанс-буст\n"
+        "<code>/admin give_all_skins [user_id]</code> — все скины\n\n"
+        "💳 <b>Платежи</b>\n"
+        "<code>/admin kaspi</code> — панель Kaspi Pay\n\n"
+        "🔧 <b>Система</b>\n"
+        "<code>/admin health</code> — статус бота\n\n"
     )
 
 
 async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if not _is_admin(user.id):
-        await update.message.reply_text("⛔ У тебя нет прав на админ-команды.")
+        await update.message.reply_text("⛔ У тебя нет прав на админ-команду.")
         return
 
     args = context.args or []
     if not args or args[0].lower() in {"help", "panel"}:
-        await update.message.reply_text(_admin_help_text(), parse_mode=ParseMode.HTML)
+        text = (
+            "🛠 <b>АДМИН-ПАНЕЛЬ</b>\n"
+            "════════════════════\n\n"
+            "👋 Добро пожаловать, {admin_name}!\n\n"
+            "Выберите действие или используйте команды:\n\n"
+            "📋 <b>Управление пользователями</b>\n"
+            "• <code>/ban</code> — забанить пользователя\n"
+            "• <code>/unban</code> — разбанить\n"
+            "• <code>/finduser</code> — найти по юзернейму\n"
+            "• <code>/checkuser</code> — полный отчёт\n"
+            "• <code>/broadcast</code> — рассылка всем\n\n"
+            "💰 <b>Валюта и ресурсы</b>\n"
+            "• <code>/admin add_coins</code> — +фишки\n"
+            "• <code>/admin remove_coins</code> — -фишки\n"
+            "• <code>/admin add_gold</code> — +золото\n\n"
+            "🎰 <b>Настройки игры</b>\n"
+            "• <code>/admin set_luck</code> — шанс-буст\n"
+            "• <code>/admin give_all_skins</code> — все скины\n\n"
+            "💳 <b>Платежи</b>\n"
+            "• <code>/admin kaspi</code> — панель Kaspi Pay\n\n"
+            "🔧 <b>Система</b>\n"
+            "• <code>/admin health</code> — статус бота\n\n"
+            "💡 Используйте <code>/admin help</code> для справки"
+        ).format(admin_name=user.first_name)
+        await update.message.reply_text(text, parse_mode=ParseMode.HTML)
         return
 
     cmd = args[0].lower()
