@@ -22,9 +22,13 @@ logger = logging.getLogger(__name__)
 
 
 def main():
-    # Initialize database (run async init_db in temporary event loop)
+    # Initialize database
     import asyncio
     asyncio.run(init_db())
+    
+    # Create event loop for Python 3.14 compatibility
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     
     # Create application
     application = Application.builder().token(TOKEN).build()
