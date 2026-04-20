@@ -36,30 +36,33 @@ async def is_user_banned(user_id: int) -> bool:
             return await cursor.fetchone() is not None
 
 
-async def find_user_by_username(username: str) -> Optional[dict]:
-    """Find user by username (case insensitive)."""
+async def find_user_by_username(username: str) -> Optional[Dict]:
+    """Найти пользователя по username."""
     async with aiosqlite.connect(DB_NAME) as db:
+        db.row_factory = aiosqlite.Row
         async with db.execute(
-            'SELECT user_id, username, first_name FROM users WHERE LOWER(username) = LOWER(?)',
+            'SELECT user_id, username, first_name FROM players WHERE LOWER(username) = LOWER(?)',
             (username,)
         ) as cursor:
             row = await cursor.fetchone()
             if row:
-                return {'user_id': row[0], 'username': row[1], 'first_name': row[2]}
+                return dict(row)
             return None
 
 
 async def get_user_full_report(user_id: int) -> Optional[dict]:
     """Get full user report including stats and history."""
     async with aiosqlite.connect(DB_NAME) as db:
+        db.row_factory = aiosqlite.Row
         # Get user info
         async with db.execute(
-            'SELECT user_id, username, first_name, gold, chips FROM users WHERE user_id = ?',
+            'SELECT user_id, username, first_name, gold, current_balance FROM players WHERE user_id = ?',
             (user_id,)
         ) as cursor:
-            user_row = await cursor.fetchone()
-            if not user_row:
+            row = await cursor.fetchone()
+            if not row:
                 return None
+            user_info = dict(row)
         
         # Get stats
         async with db.execute(
@@ -80,11 +83,11 @@ async def get_user_full_report(user_id: int) -> Optional[dict]:
         is_banned = await is_user_banned(user_id)
         
         return {
-            'user_id': user_row[0],
-            'username': user_row[1],
-            'first_name': user_row[2],
-            'gold': user_row[3],
-            'chips': user_row[4],
+            'user_id': user_info['user_id'],
+            'username': user_info.get('username', ''),
+            'first_name': user_info.get('first_name', ''),
+            'gold': user_info.get('gold', 0),
+            'chips': user_info.get('current_balance', 0),
             'games_played': stats_row[0] if stats_row else 0,
             'wins': stats_row[1] if stats_row else 0,
             'total_winnings': stats_row[2] if stats_row else 0,
@@ -98,7 +101,7 @@ async def get_user_full_report(user_id: int) -> Optional[dict]:
 async def get_all_user_ids() -> List[int]:
     """Get all user IDs for broadcast."""
     async with aiosqlite.connect(DB_NAME) as db:
-        async with db.execute('SELECT user_id FROM users') as cursor:
+        async with db.execute('SELECT user_id FROM players') as cursor:
             rows = await cursor.fetchall()
             return [row[0] for row in rows]
 
