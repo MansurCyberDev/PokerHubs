@@ -54,9 +54,9 @@ async def get_user_full_report(user_id: int) -> Optional[dict]:
     """Get full user report including stats and history."""
     async with aiosqlite.connect(DB_NAME) as db:
         db.row_factory = aiosqlite.Row
-        # Get user info
+        # Get user info with stats from players table
         async with db.execute(
-            'SELECT user_id, username, first_name, gold, current_balance FROM players WHERE user_id = ?',
+            'SELECT user_id, username, first_name, gold, current_balance, games_played, games_won, total_winnings, biggest_win FROM players WHERE user_id = ?',
             (user_id,)
         ) as cursor:
             row = await cursor.fetchone()
@@ -64,17 +64,10 @@ async def get_user_full_report(user_id: int) -> Optional[dict]:
                 return None
             user_info = dict(row)
         
-        # Get stats
-        async with db.execute(
-            'SELECT games_played, wins, total_winnings, biggest_win FROM user_stats WHERE user_id = ?',
-            (user_id,)
-        ) as cursor:
-            stats_row = await cursor.fetchone()
-        
-        # Get games count today
+        # Get games count today from hand_history
         today = datetime.now().strftime('%Y-%m-%d')
         async with db.execute(
-            'SELECT COUNT(*) FROM game_history WHERE user_id = ? AND date(played_at) = date(?)',
+            'SELECT COUNT(*) FROM hand_history WHERE user_id = ? AND date(timestamp) = date(?)',
             (user_id, today)
         ) as cursor:
             games_today = (await cursor.fetchone())[0]
@@ -88,13 +81,13 @@ async def get_user_full_report(user_id: int) -> Optional[dict]:
             'first_name': user_info.get('first_name', ''),
             'gold': user_info.get('gold', 0),
             'chips': user_info.get('current_balance', 0),
-            'games_played': stats_row[0] if stats_row else 0,
-            'wins': stats_row[1] if stats_row else 0,
-            'total_winnings': stats_row[2] if stats_row else 0,
-            'biggest_win': stats_row[3] if stats_row else 0,
+            'games_played': user_info.get('games_played', 0),
+            'wins': user_info.get('games_won', 0),
+            'total_winnings': user_info.get('total_winnings', 0),
+            'biggest_win': user_info.get('biggest_win', 0),
             'games_today': games_today,
             'is_banned': is_banned,
-            'win_rate': round((stats_row[1] / stats_row[0] * 100), 1) if stats_row and stats_row[0] > 0 else 0
+            'win_rate': round((user_info.get('games_won', 0) / user_info.get('games_played', 1) * 100), 1) if user_info.get('games_played', 0) > 0 else 0
         }
 
 
