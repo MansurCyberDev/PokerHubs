@@ -1,33 +1,4 @@
-name: pokerbot
+name: pokerhubs
 runtime: python3
 entrypoint: python main.py
-
-# Описание проекта
-description: Telegram Poker Bot with Kaspi Pay integration
-
-# Переменные окружения (будут заданы в веб-интерфейсе)
-# env:
-#   - POKER_BOT_TOKEN
-#   - POKER_ADMIN_IDS
-#   - KASPI_PHONE_NUMBER
-#   - POKER_SUPPORT_USERNAME
-
-# Игнорировать файлы (аналог .gitignore для загрузки)
-exclude:
-  - .venv
-  - .git
-  - __pycache__
-  - .pycache
-  - .idea
-  - .cursor
-  - logs/*.log
-  - poker_stats.db
-  - .DS_Store
-  - Cards Design
-  - assets/*.psd
-
-# Тип процесса
 processType: worker
-
-# Не используем порт (бот работает через polling, не webhook)
-# port: 8080
