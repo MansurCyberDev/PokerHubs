@@ -1,5 +1,11 @@
 meta:
-  name: pokerhubs
-  runtime: python3
-  entrypoint: python main.py
-  processType: worker
+  environment: python
+  toolchain:
+    name: pip
+    version: "3.11"
+build:
+  requirementsPath: requirements.txt
+  useCache: true
+run:
+  command: python main.py
+  persistenceMount: /data
