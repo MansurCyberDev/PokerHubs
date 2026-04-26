@@ -1,4 +1,5 @@
-name: pokerhubs
-runtime: python3
-entrypoint: python main.py
-processType: worker
+meta:
+  name: pokerhubs
+  runtime: python3
+  entrypoint: python main.py
+  processType: worker
