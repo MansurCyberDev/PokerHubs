@@ -1,4 +1,5 @@
 import logging
+import asyncio
 from telegram import Update
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 
@@ -21,14 +22,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def main():
+async def async_main():
     # Initialize database
-    import asyncio
-    asyncio.run(init_db())
-    
-    # Create event loop for Python 3.14 compatibility
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    await init_db()
     
     # Create application
     application = Application.builder().token(TOKEN).build()
@@ -76,7 +72,7 @@ def main():
     # Kaspi
     application.add_handler(CallbackQueryHandler(kaspi_callback, pattern="^kaspi_"))
     application.add_handler(CallbackQueryHandler(admin_kaspi_callback, pattern="^admin_kaspi_|^admin_approve_|^admin_reject_|^admin_view_payment_"))
-    application.add_handler(CallbackQueryHandler(admin_issues_callback, pattern="^admin_issues|admin_view_issue_|admin_reply_issue_"))
+    application.add_handler(CallbackQueryHandler(admin_issues_callback, pattern="^(admin_issues|admin_view_issue_|admin_reply_issue_)"))
 
     # === MESSAGE HANDLERS ===
     application.add_handler(MessageHandler(filters.PHOTO & filters.ChatType.PRIVATE, kaspi_receipt_photo_handler))
@@ -85,7 +81,20 @@ def main():
     logger.info("🤖 Bot started!")
     
     # Start polling
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+    
+    # Keep the bot running
+    while True:
+        await asyncio.sleep(3600)
+
+
+def main():
+    try:
+        asyncio.run(async_main())
+    except KeyboardInterrupt:
+        logger.info("🛑 Bot stopped by user")
 
 
 if __name__ == '__main__':

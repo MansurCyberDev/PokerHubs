@@ -1,14 +1,14 @@
 import os
 
 # Токен задается через ENV (можно также указать напрямую для разработки)
-TOKEN = os.getenv("POKER_BOT_TOKEN", "8633427504:AAG-vnFD5raHl1WOxjtBXTKQ_YJTsqYUzDY")
+TOKEN = os.getenv("POKER_BOT_TOKEN", "8633427504:AAGXYQm5HwAKO7zCUGx4FIC4VR9lN5_vUn8")
 
 # Вставь сюда свой ID (или несколько через запятую) для админ-прав
 ADMIN_IDS = [int(x.strip()) for x in os.getenv("POKER_ADMIN_IDS", "5491969475").split(",") if x.strip()]
-SUPPORT_USERNAME = os.getenv("POKER_SUPPORT_USERNAME", "")
+SUPPORT_USERNAME = os.getenv("desperadosm", "")
 
 # Kaspi Pay configuration
-KASPI_PHONE_NUMBER = os.getenv("KASPI_PHONE_NUMBER", "+77012345678")  # Номер для переводов Kaspi
+KASPI_PHONE_NUMBER = os.getenv("KASPI_PHONE_NUMBER", "+77777592143")  # Номер для переводов Kaspi
 
 # Настройки игры (можно переопределить через ENV)
 MIN_PLAYERS = int(os.getenv("POKER_MIN_PLAYERS", "2"))

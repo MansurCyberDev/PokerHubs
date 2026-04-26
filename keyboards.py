@@ -420,20 +420,16 @@ def get_kaspi_receipt_upload_keyboard(payment_id: int, lang: str = "ru") -> Inli
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_admin_kaspi_panel_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
-    """Админ-панель Kaspi платежей."""
+def get_admin_requests_panel_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
+    """Админ-панель заявок (платежи + обращения)."""
     is_en = lang == "en"
     keyboard = [
         [InlineKeyboardButton(
-            "⏳ " + ("Pending payments" if is_en else "Ожидающие заявки"), 
+            "💳 " + ("Kaspi payments" if is_en else "Kaspi платежи"),
             callback_data="admin_kaspi_pending"
         )],
         [InlineKeyboardButton(
-            "📊 " + ("Payment statistics" if is_en else "Статистика платежей"), 
-            callback_data="admin_kaspi_stats"
-        )],
-        [InlineKeyboardButton(
-            "📝 " + ("User issues" if is_en else "Обращения пользователей"), 
+            "📝 " + ("User issues" if is_en else "Обращения пользователей"),
             callback_data="admin_issues"
         )],
         [InlineKeyboardButton("🔙 " + ("Back" if is_en else "Назад"), callback_data="menu_main")],

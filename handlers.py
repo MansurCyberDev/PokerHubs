@@ -2012,13 +2012,11 @@ async def inventory_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Выбери категорию для управления скинами:\n\n"
         f"🃏 Колоды карт — просмотр и выбор скинов карт\n"
         f"🎰 Скины столов — изменение вида стола\n"
-        f"🎲 Скины фишек — стиль фишек"
     )
     
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🃏 " + ("Card Decks" if lang == "en" else "Колоды карт"), callback_data="inv_category_cards")],
         [InlineKeyboardButton("🎰 " + ("Table Skins" if lang == "en" else "Скины столов"), callback_data="inv_category_tables")],
-        [InlineKeyboardButton("🎲 " + ("Chip Skins" if lang == "en" else "Скины фишек"), callback_data="inv_category_chips")],
     ])
     
     await update.message.reply_text(text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
@@ -2045,8 +2043,8 @@ def _admin_help_text() -> str:
         "🎰 <b>Настройки игры</b>\n"
         "<code>/admin set_luck user_id percent</code> — шанс-буст\n"
         "<code>/admin give_all_skins [user_id]</code> — все скины\n\n"
-        "💳 <b>Платежи</b>\n"
-        "<code>/admin kaspi</code> — панель Kaspi Pay\n\n"
+        "📋 <b>Заявки</b>\n"
+        "<code>/admin requests</code> — заявки Kaspi и обращения\n\n"
         "🔧 <b>Система</b>\n"
         "<code>/admin health</code> — статус бота\n\n"
     )
@@ -2075,8 +2073,8 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• <code>/admin add_coins</code> — +фишки\n"
             "• <code>/admin remove_coins</code> — -фишки\n"
             "• <code>/admin add_gold</code> — +золото\n\n"
-            "💳 <b>Платежи</b>\n"
-            "• <code>/admin kaspi</code> — панель Kaspi Pay\n\n"
+            "📋 <b>Заявки</b>\n"
+            "• <code>/admin requests</code> — заявки Kaspi и обращения\n\n"
             "🔧 <b>Система</b>\n"
             "• <code>/admin health</code> — статус бота\n\n"
             "💡 Используйте <code>/admin help</code> для справки"
@@ -2086,20 +2084,20 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     cmd = args[0].lower()
     
-    # Kaspi panel command
-    if cmd == "kaspi":
-        from keyboards import get_admin_kaspi_panel_keyboard
+    # Requests panel command (payments + issues)
+    if cmd == "requests":
+        from keyboards import get_admin_requests_panel_keyboard
         text = (
-            "💳 <b>KASPI PAY — АДМИН-ПАНЕЛЬ</b>\n"
+            "📋 <b>ПАНЕЛЬ ЗАЯВОК</b>\n"
             "════════════════════\n\n"
-            "Управление платежами через Kaspi:\n\n"
-            "⏳ Просмотр ожидающих заявок\n"
-            "📊 Статистика платежей\n"
-            "✅/❌ Одобрение/отклонение"
+            "Управление заявками:\n\n"
+            "💳 Платежи Kaspi\n"
+            "📝 Обращения пользователей\n\n"
+            "Выберите раздел:"
         )
         await update.message.reply_text(
             text,
-            reply_markup=get_admin_kaspi_panel_keyboard("ru"),
+            reply_markup=get_admin_requests_panel_keyboard("ru"),
             parse_mode=ParseMode.HTML
         )
         return
@@ -2424,8 +2422,10 @@ async def private_text_router(update: Update, context: ContextTypes.DEFAULT_TYPE
     user = update.effective_user
     from config import ADMIN_IDS
     if user.id in ADMIN_IDS:
-        # Check if admin is approving/rejecting with comment
-        if context.user_data.get('rejecting_payment') or context.user_data.get('approving_payment'):
+        # Check if admin is approving/rejecting with comment or replying to issue
+        if (context.user_data.get('rejecting_payment') or 
+            context.user_data.get('approving_payment') or
+            context.user_data.get('replying_to_issue')):
             # Delegate to kaspi admin handler
             from kaspi_handlers import admin_kaspi_text_handler
             await admin_kaspi_text_handler(update, context)

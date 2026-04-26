@@ -1,0 +1,45 @@
+# Amvera ignore file
+# Что не загружать на сервер
+
+# Виртуальное окружение
+.venv/
+venv/
+env/
+
+# Git
+.git/
+.gitignore
+
+# Python кэш
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# IDE
+.idea/
+.cursor/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Локальные данные
+poker_stats.db
+*.db-journal
+logs/*.log
+
+# Системные файлы
+.DS_Store
+Thumbs.db
+
+# Дизайн файлы (не нужны для работы бота)
+Cards Design/
+*.psd
+*.ai
+*.sketch
+
+# Документация и тесты (опционально)
+# README.md
+# tests/

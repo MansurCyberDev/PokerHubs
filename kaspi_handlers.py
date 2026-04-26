@@ -2,7 +2,10 @@ from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 from handlers import _user_lang
-from keyboards import get_admin_kaspi_panel_keyboard, get_admin_payment_action_keyboard, get_admin_payment_view_keyboard
+from keyboards import (get_admin_requests_panel_keyboard, get_admin_payment_action_keyboard, 
+                       get_admin_payment_view_keyboard, get_admin_issues_panel_keyboard,
+                       get_admin_pending_issues_keyboard, get_admin_pending_list_keyboard,
+                       get_admin_issue_action_keyboard)
 from config import SUPPORT_USERNAME, KASPI_PHONE_NUMBER
 
 # ==================== KASPI PAY HANDLERS ====================
@@ -356,7 +359,7 @@ async def admin_kaspi_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         if not all_payments:
             await query.edit_message_text(
                 "✅ Нет заявок" if not is_en else "✅ No payments",
-                reply_markup=get_admin_kaspi_panel_keyboard(lang)
+                reply_markup=get_admin_requests_panel_keyboard(lang)
             )
             return
         
@@ -412,7 +415,7 @@ async def admin_kaspi_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         
         await query.edit_message_text(
             text,
-            reply_markup=get_admin_kaspi_panel_keyboard(lang),
+            reply_markup=get_admin_requests_panel_keyboard(lang),
             parse_mode=ParseMode.HTML
         )
         
@@ -646,7 +649,7 @@ async def process_payment_approval(update: Update, context: ContextTypes.DEFAULT
     else:
         await update.effective_message.reply_text(
             "✅ Нет заявок!" if lang != "en" else "✅ No payments!",
-            reply_markup=get_admin_kaspi_panel_keyboard(lang)
+            reply_markup=get_admin_requests_panel_keyboard(lang)
         )
 
 
@@ -756,7 +759,7 @@ async def process_payment_rejection(update: Update, context: ContextTypes.DEFAUL
         await update.message.reply_text(
             f"✅ Нет заявок!\n{user_notification_status}" if lang != "en" 
             else f"✅ No payments!\n{user_notification_status}",
-            reply_markup=get_admin_kaspi_panel_keyboard(lang)
+            reply_markup=get_admin_requests_panel_keyboard(lang)
         )
 
 
@@ -937,6 +940,7 @@ async def process_issue_reply(update: Update, context: ContextTypes.DEFAULT_TYPE
     """Process admin reply to issue and notify user."""
     from database import reply_to_issue, get_issue
     from config import ADMIN_IDS
+    from telegram.error import BadRequest
     
     admin = update.effective_user
     success = await reply_to_issue(issue_id, admin.id, reply_text)
@@ -953,6 +957,7 @@ async def process_issue_reply(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     # Notify user about reply
     user_notified = False
+    notification_error = None
     try:
         text = (
             f"📩 <b>ОТВЕТ ОТ АДМИНИСТРАТОРА</b>\n\n"
@@ -975,7 +980,18 @@ async def process_issue_reply(update: Update, context: ContextTypes.DEFAULT_TYPE
         await context.bot.send_message(user_id, text, parse_mode=ParseMode.HTML)
         user_notified = True
         print(f"✅ User {user_id} notified about reply to issue #{issue_id}")
+    except BadRequest as e:
+        error_msg = str(e)
+        notification_error = error_msg
+        print(f"❌ BadRequest notifying user {user_id}: {error_msg}")
+        if "bot was blocked by the user" in error_msg.lower():
+            print(f"   User {user_id} has blocked the bot")
+        elif "user is deactivated" in error_msg.lower():
+            print(f"   User {user_id} account is deactivated")
+        elif "chat not found" in error_msg.lower():
+            print(f"   Chat not found for user {user_id} - user may not have started the bot")
     except Exception as e:
+        notification_error = str(e)
         print(f"❌ Failed to notify user {user_id} about issue reply: {e}")
         import traceback
         traceback.print_exc()
@@ -985,11 +1001,21 @@ async def process_issue_reply(update: Update, context: ContextTypes.DEFAULT_TYPE
     from keyboards import get_admin_pending_issues_keyboard, get_admin_issues_panel_keyboard
     pending = await get_pending_issues()
     
-    user_notification_status = (
-        "✅ Пользователь уведомлен" if user_notified else "⚠️ Не удалось уведомить пользователя"
-    ) if lang != "en" else (
-        "✅ User notified" if user_notified else "⚠️ Failed to notify user"
-    )
+    # Build detailed notification status
+    if user_notified:
+        user_notification_status = (
+            "✅ Пользователь уведомлен" if lang != "en" else "✅ User notified"
+        )
+    else:
+        if notification_error:
+            user_notification_status = (
+                f"⚠️ Не удалось уведомить пользователя:\n{notification_error}" if lang != "en" else
+                f"⚠️ Failed to notify user:\n{notification_error}"
+            )
+        else:
+            user_notification_status = (
+                "⚠️ Не удалось уведомить пользователя" if lang != "en" else "⚠️ Failed to notify user"
+            )
     
     if pending:
         text = (
