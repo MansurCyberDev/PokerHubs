@@ -3692,7 +3692,6 @@ async def chips_ad_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             
             # Simple keyboard with just back button
-            from telegram import InlineKeyboardButton
             back_kb = InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔙 " + ("Back" if lang == "en" else "Назад"), callback_data="menu_profile")]
             ])
