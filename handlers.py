@@ -3423,6 +3423,24 @@ async def chips_ad_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Answer callback immediately to prevent timeout
             await query.answer("⏳ Preparing video..." if lang == "en" else "⏳ Готовлю видео...")
             
+            # Send loading message while video uploads
+            loading_text = (
+                f"⏳ <b>Loading video...</b>\n\n"
+                f"Please wait, the video is being sent."
+                if lang == "en" else
+                f"⏳ <b>Видео загружается...</b>\n\n"
+                f"Пожалуйста, подожди, видео отправляется."
+            )
+            loading_msg = await context.bot.send_message(
+                chat_id=user.id,
+                text=loading_text,
+                parse_mode=ParseMode.HTML
+            )
+            context.user_data['ad_loading_msg_id'] = loading_msg.message_id
+            
+            # Clear any previous warning message ID
+            context.user_data.pop('ad_warning_msg_id', None)
+            
             # Prepare text message
             text = (
                 f"📺 <b>REWARDED VIDEO</b>\n════════════════════\n\n"
@@ -3550,6 +3568,15 @@ async def chips_ad_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             print(f"DEBUG: Video sent successfully")
             
+            # Delete loading message
+            loading_msg_id = context.user_data.pop('ad_loading_msg_id', None)
+            if loading_msg_id:
+                try:
+                    await context.bot.delete_message(user.id, loading_msg_id)
+                    print(f"DEBUG: Deleted loading message")
+                except Exception as e:
+                    print(f"DEBUG: Could not delete loading message: {e}")
+            
             # Cleanup compressed file if used
             if video_to_send == compressed_path:
                 try:
@@ -3618,7 +3645,8 @@ async def chips_ad_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"Ты должен досмотреть видео до конца, чтобы получить награду.\n"
                     f"Пожалуйста, продолжай смотреть ещё <b>{remaining} секунд</b>."
                 )
-                await context.bot.send_message(user.id, warning_text, parse_mode=ParseMode.HTML)
+                warning_msg = await context.bot.send_message(user.id, warning_text, parse_mode=ParseMode.HTML)
+                context.user_data['ad_warning_msg_id'] = warning_msg.message_id
                 return
             
             # Enough time passed - user watched the video, give reward
@@ -3629,21 +3657,33 @@ async def chips_ad_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 show_alert=True
             )
             
-            # Update message to show success
+            # Delete warning message if exists
+            warning_msg_id = context.user_data.pop('ad_warning_msg_id', None)
+            if warning_msg_id:
+                try:
+                    await context.bot.delete_message(user.id, warning_msg_id)
+                except Exception:
+                    pass
+            
+            # Show simple success message without extra buttons
             text = (
                 f"✅ <b>REWARD CLAIMED!</b>\n════════════════════\n\n"
-                f"🎉 You received <b>3000 chips</b>!\n\n"
-                f"Want to watch again for more?"
+                f"🎉 You received <b>3000 chips</b>!"
                 if lang == "en" else
                 f"✅ <b>НАГРАДА ПОЛУЧЕНА!</b>\n════════════════════\n\n"
-                f"🎉 Ты получил <b>3000 фишек</b>!\n\n"
-                f"Хочешь посмотреть еще раз?"
+                f"🎉 Ты получил <b>3000 фишек</b>!"
             )
+            
+            # Simple keyboard with just back button
+            from telegram import InlineKeyboardButton
+            back_kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 " + ("Back" if lang == "en" else "Назад"), callback_data="menu_profile")]
+            ])
             
             await safe_edit_message_text(
                 query, 
                 text,
-                reply_markup=get_chips_packages_keyboard(lang=lang),
+                reply_markup=back_kb,
                 parse_mode=ParseMode.HTML
             )
         except Exception as e:
