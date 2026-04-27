@@ -3436,8 +3436,9 @@ async def chips_ad_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"⏳ После просмотра нажми кнопку '✅ Я посмотрел'"
             )
             
-            # Video file path - user should place your video here
-            video_path = "/Users/mansur/Desktop/PokerHubs/assets/ad_video.mp4"
+            # Video file path - relative for cloud deployment
+            import os
+            video_path = os.path.join(os.path.dirname(__file__), "assets", "ad_video.mp4")
             
             # Check if video exists (non-blocking via thread pool)
             def check_file_exists(path):
@@ -3457,8 +3458,8 @@ async def chips_ad_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     user.id,
                     f"⚠️ <b>Video not found!</b>\n\n"
                     f"Place your ad video at:\n"
-                    f"<code>/Users/mansur/Desktop/PokerHubs/assets/ad_video.mp4</code>\n\n"
-                    f"Then try again.",
+                    f"<code>assets/ad_video.mp4</code>\n\n"
+                    f"Then redeploy and try again.",
                     parse_mode=ParseMode.HTML
                 )
                 return
@@ -3519,12 +3520,18 @@ async def chips_ad_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # Try to send video
             print(f"DEBUG: Sending video from: {video_to_send}")
+            print(f"DEBUG: File exists check: {os.path.exists(video_to_send)}")
+            print(f"DEBUG: File size: {os.path.getsize(video_to_send) if os.path.exists(video_to_send) else 'N/A'}")
             from telegram import InputFile
             import random
             
             unique_filename = f"ad_video_{random.randint(1000, 9999)}.mp4"
-            video_file = open(video_to_send, 'rb')
-            input_file = InputFile(video_file, filename=unique_filename)
+            
+            # Read file into memory for Render compatibility
+            with open(video_to_send, 'rb') as video_file:
+                video_data = video_file.read()
+                print(f"DEBUG: Read {len(video_data)} bytes from video file")
+                input_file = InputFile(video_data, filename=unique_filename)
             
             await context.bot.send_video(
                 chat_id=user.id,
@@ -3541,7 +3548,6 @@ async def chips_ad_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 read_timeout=300,
                 write_timeout=300
             )
-            video_file.close()
             print(f"DEBUG: Video sent successfully")
             
             # Cleanup compressed file if used
