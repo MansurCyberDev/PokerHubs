@@ -3456,28 +3456,45 @@ async def chips_ad_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # Video file path - relative for cloud deployment
             import os
-            video_path = os.path.join(os.path.dirname(__file__), "assets", "ad_video.mp4")
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            video_path = os.path.join(script_dir, "assets", "ad_video.mp4")
+            
+            # Debug: print all path info
+            print(f"DEBUG __file__: {__file__}")
+            print(f"DEBUG script_dir: {script_dir}")
+            print(f"DEBUG cwd: {os.getcwd()}")
+            print(f"DEBUG video_path: {video_path}")
+            print(f"DEBUG assets exists: {os.path.exists(os.path.join(script_dir, 'assets'))}")
+            if os.path.exists(os.path.join(script_dir, 'assets')):
+                print(f"DEBUG assets contents: {os.listdir(os.path.join(script_dir, 'assets'))}")
             
             # Check if video exists (non-blocking via thread pool)
             def check_file_exists(path):
                 import os
-                return os.path.exists(path) and os.path.getsize(path) > 0
+                exists = os.path.exists(path)
+                size = os.path.getsize(path) if exists else 0
+                return exists and size > 0, exists, size
             
             try:
-                video_exists = await asyncio.to_thread(check_file_exists, video_path)
-                print(f"DEBUG video exists: {video_exists}, path={video_path}")
+                result = await asyncio.to_thread(check_file_exists, video_path)
+                video_exists, raw_exists, file_size = result
+                print(f"DEBUG video exists: {video_exists}, raw_exists: {raw_exists}, size: {file_size}")
             except Exception as e:
                 print(f"DEBUG error checking file: {e}")
+                import traceback
+                traceback.print_exc()
                 video_exists = False
             
             if not video_exists:
                 # Video not found
+                debug_info = f"Path: {video_path}, CWD: {os.getcwd()}, Assets exists: {os.path.exists(os.path.join(script_dir, 'assets'))}"
+                print(f"DEBUG ERROR: Video not found! {debug_info}")
                 await context.bot.send_message(
                     user.id,
                     f"⚠️ <b>Video not found!</b>\n\n"
-                    f"Place your ad video at:\n"
-                    f"<code>assets/ad_video.mp4</code>\n\n"
-                    f"Then redeploy and try again.",
+                    f"Path tried: <code>{video_path}</code>\n"
+                    f"CWD: <code>{os.getcwd()}</code>\n\n"
+                    f"Please check the logs and redeploy.",
                     parse_mode=ParseMode.HTML
                 )
                 return
