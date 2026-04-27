@@ -3682,7 +3682,13 @@ async def chips_ad_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except Exception:
                     pass
             
-            # Show simple success message without extra buttons
+            # Delete the video message completely
+            try:
+                await query.delete_message()
+            except Exception as e:
+                print(f"DEBUG: Could not delete video message: {e}")
+            
+            # Send new success message (clean, without video)
             text = (
                 f"✅ <b>REWARD CLAIMED!</b>\n════════════════════\n\n"
                 f"🎉 You received <b>3000 chips</b>!"
@@ -3696,12 +3702,17 @@ async def chips_ad_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 [InlineKeyboardButton("🔙 " + ("Back" if lang == "en" else "Назад"), callback_data="menu_profile")]
             ])
             
-            await safe_edit_message_text(
-                query, 
-                text,
+            await context.bot.send_message(
+                chat_id=user.id,
+                text=text,
                 reply_markup=back_kb,
                 parse_mode=ParseMode.HTML
             )
+            
+            # Clear ad data
+            context.user_data.pop('ad_watch_start', None)
+            context.user_data.pop('ad_video_duration', None)
+            context.user_data.pop('ad_video_msg_id', None)
         except Exception as e:
             print(f"Error crediting chips: {e}")
             await query.answer(
