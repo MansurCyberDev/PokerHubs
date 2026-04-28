@@ -5,7 +5,7 @@ TOKEN = os.getenv("POKER_BOT_TOKEN", "8633427504:AAGXYQm5HwAKO7zCUGx4FIC4VR9lN5_
 
 # Вставь сюда свой ID (или несколько через запятую) для админ-прав
 ADMIN_IDS = [int(x.strip()) for x in os.getenv("POKER_ADMIN_IDS", "5491969475").split(",") if x.strip()]
-SUPPORT_USERNAME = os.getenv("desperadosm", "")
+SUPPORT_USERNAME = os.getenv("POKER_SUPPORT_USERNAME", "golovorezsm")
 
 # Kaspi Pay configuration
 KASPI_CARD = os.getenv("KASPI_CARD", "4400430233136370")  # Номер карты для переводов Kaspi
