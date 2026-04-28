@@ -6,7 +6,7 @@ from keyboards import (get_admin_requests_panel_keyboard, get_admin_payment_acti
                        get_admin_payment_view_keyboard, get_admin_issues_panel_keyboard,
                        get_admin_pending_issues_keyboard, get_admin_pending_list_keyboard,
                        get_admin_issue_action_keyboard)
-from config import SUPPORT_USERNAME, KASPI_PHONE_NUMBER
+from config import SUPPORT_USERNAME, KASPI_CARD
 
 # ==================== KASPI PAY HANDLERS ====================
 
@@ -60,14 +60,14 @@ async def kaspi_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"════════════════════\n\n"
             f"Выбери пакет фишек для покупки:\n\n"
             f"💰 Оплата через Kaspi (Казахстан)\n"
-            f"📱 Перевод на номер +77012345678\n"
+            f"💳 Перевод на карту: <code>{KASPI_CARD}</code>\n"
             f"⏰ Подтверждение 5-30 минут"
         ) if not is_en else (
             f"💳 <b>KASPI PAY — CHIPS</b>\n"
             f"════════════════════\n\n"
             f"Choose chip package:\n\n"
             f"💰 Payment via Kaspi (Kazakhstan)\n"
-            f"📱 Transfer to +77012345678\n"
+            f"💳 Transfer to card: <code>{KASPI_CARD}</code>\n"
             f"⏰ Confirmation 5-30 minutes"
         )
         
@@ -85,14 +85,14 @@ async def kaspi_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"════════════════════\n\n"
             f"Выбери пакет Gold для покупки:\n\n"
             f"💰 Оплата через Kaspi (Казахстан)\n"
-            f"📱 Перевод на номер +77012345678\n"
+            f"💳 Перевод на карту: <code>{KASPI_CARD}</code>\n"
             f"⏰ Подтверждение 5-30 минут"
         ) if not is_en else (
             f"💳 <b>KASPI PAY — GOLD</b>\n"
             f"════════════════════\n\n"
             f"Choose Gold package:\n\n"
             f"💰 Payment via Kaspi (Kazakhstan)\n"
-            f"📱 Transfer to +77012345678\n"
+            f"💳 Transfer to card: <code>{KASPI_CARD}</code>\n"
             f"⏰ Confirmation 5-30 minutes"
         )
         
@@ -131,7 +131,7 @@ async def kaspi_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"<b>Инструкция по оплате:</b>\n\n"
             f"1️⃣ Открой приложение Kaspi\n"
             f"2️⃣ Нажми «Переводы»\n"
-            f"3️⃣ Введи номер: <code>{KASPI_PHONE_NUMBER}</code>\n"
+            f"3️⃣ Введи карту: <code>{KASPI_CARD}</code>\n"
             f"4️⃣ Укажи сумму: <b>{amount_kzt} ₸</b>\n"
             f"5️⃣ В комментарии напиши:\n"
             f"<code>PAY{payment_id}</code>\n\n"
@@ -146,7 +146,7 @@ async def kaspi_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"<b>Payment Instructions:</b>\n\n"
             f"1️⃣ Open Kaspi app\n"
             f"2️⃣ Tap «Transfers»\n"
-            f"3️⃣ Enter number: <code>{KASPI_PHONE_NUMBER}</code>\n"
+            f"3️⃣ Enter card: <code>{KASPI_CARD}</code>\n"
             f"4️⃣ Amount: <b>{amount_kzt} ₸</b>\n"
             f"5️⃣ In comment write:\n"
             f"<code>PAY{payment_id}</code>\n\n"

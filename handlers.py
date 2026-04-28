@@ -31,7 +31,7 @@ from utils import (
 )
 from cards import HandEvaluator
 from skins import SKINS, DEFAULT_SKIN, TABLE_SKINS, DEFAULT_TABLE_SKIN
-from config import MIN_PLAYERS, REGISTRATION_TIME, SMALL_BLIND, BIG_BLIND, ADMIN_IDS, SUPPORT_USERNAME, KASPI_PHONE_NUMBER
+from config import MIN_PLAYERS, REGISTRATION_TIME, SMALL_BLIND, BIG_BLIND, ADMIN_IDS, SUPPORT_USERNAME, KASPI_CARD
 # user_id -> active game chat_id (для работы кнопок из ЛС)
 user_active_games = {}
 # user_id -> last DM prompt message_id (чтобы удалять старые кнопки)
@@ -3073,7 +3073,7 @@ async def shop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"════════════════════\n\n"
             f"Purchase gold via Kaspi Pay (Kazakhstan):\n\n"
             f"💰 Payment: Kaspi transfer\n"
-            f"📱 To: {KASPI_PHONE_NUMBER}\n"
+            f"💳 Card: <code>{KASPI_CARD}</code>\n"
             f"⚡ After approval: Gold instantly credited\n\n"
             f"Select package:"
             if lang == "en" else
@@ -3081,7 +3081,7 @@ async def shop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"════════════════════\n\n"
             f"Купи золото через Kaspi Pay (Казахстан):\n\n"
             f"💰 Оплата: перевод Kaspi\n"
-            f"📱 Получатель: {KASPI_PHONE_NUMBER}\n"
+            f"💳 Карта: <code>{KASPI_CARD}</code>\n"
             f"⚡ После одобрения: золото мгновенно\n\n"
             f"Выбери пакет:"
         )

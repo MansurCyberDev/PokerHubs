@@ -8,7 +8,7 @@ ADMIN_IDS = [int(x.strip()) for x in os.getenv("POKER_ADMIN_IDS", "5491969475").
 SUPPORT_USERNAME = os.getenv("desperadosm", "")
 
 # Kaspi Pay configuration
-KASPI_PHONE_NUMBER = os.getenv("KASPI_PHONE_NUMBER", "+77777592143")  # Номер для переводов Kaspi
+KASPI_CARD = os.getenv("KASPI_CARD", "4400430233136370")  # Номер карты для переводов Kaspi
 
 # Настройки игры (можно переопределить через ENV)
 MIN_PLAYERS = int(os.getenv("POKER_MIN_PLAYERS", "2"))
