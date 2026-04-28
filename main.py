@@ -2,6 +2,7 @@ import logging
 import asyncio
 from telegram import Update
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
+from aiohttp import web
 
 from config import TOKEN
 from database import init_db
@@ -84,6 +85,20 @@ async def async_main():
     await application.initialize()
     await application.start()
     await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+    
+    # Start HTTP health server for Render
+    async def health_handler(request):
+        return web.Response(text='OK', status=200)
+    
+    app = web.Application()
+    app.router.add_get('/healthz', health_handler)
+    app.router.add_get('/', health_handler)
+    
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', 10000)
+    await site.start()
+    logger.info("🌐 Health server started on port 10000")
     
     # Keep the bot running
     while True:
