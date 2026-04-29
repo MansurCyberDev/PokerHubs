@@ -3405,19 +3405,30 @@ async def chips_ad_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         time_str = f"{hours}h {minutes}m"
                     else:
                         time_str = f"{minutes}m"
-                    await query.answer(
-                        f"⏳ Daily limit reached!\nCome back in {time_str}",
-                        show_alert=True
+                    cooldown_text = (
+                        f"⏳ <b>Daily limit reached!</b>\n"
+                        f"════════════════════\n\n"
+                        f"You've already received your reward today.\n"
+                        f"Come back in <b>{time_str}</b>"
                     )
                 else:
                     if hours > 0:
                         time_str = f"{hours}ч {minutes}м"
                     else:
                         time_str = f"{minutes}м"
-                    await query.answer(
-                        f"⏳ Дневной лимит достигнут!\nВозвращайся через {time_str}",
-                        show_alert=True
+                    cooldown_text = (
+                        f"⏳ <b>Дневной лимит достигнут!</b>\n"
+                        f"════════════════════\n\n"
+                        f"Ты уже получил награду сегодня.\n"
+                        f"Возвращайся через <b>{time_str}</b>"
                     )
+                
+                # Send cooldown message as regular message
+                await context.bot.send_message(
+                    chat_id=user.id,
+                    text=cooldown_text,
+                    parse_mode=ParseMode.HTML
+                )
                 return
             
             # Answer callback immediately to prevent timeout
