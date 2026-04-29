@@ -103,28 +103,28 @@ async def async_main():
     application.add_handler(CommandHandler("broadcast", broadcast_command))
     application.add_handler(CommandHandler("checkuser", checkuser_command))
 
-    # === CALLBACKS (with ban filter) ===
+    # === CALLBACKS (ban check moved to handlers.py) ===
     # Game
-    application.add_handler(CallbackQueryHandler(join_callback, pattern="^join_game$", block=False, filters=not_banned))
-    application.add_handler(CallbackQueryHandler(start_early_callback, pattern="^start_early$", block=False, filters=not_banned))
-    application.add_handler(CallbackQueryHandler(action_callback, pattern="^action_", block=False, filters=not_banned))
-    application.add_handler(CallbackQueryHandler(action_callback, pattern="^(confirm_all_in|cancel_all_in)$", block=False, filters=not_banned))
-    application.add_handler(CallbackQueryHandler(bet_amount_callback, pattern="^bet_amount_", block=False, filters=not_banned))
-    application.add_handler(CallbackQueryHandler(new_game_callback, pattern="^new_game$", block=False, filters=not_banned))
-    application.add_handler(CallbackQueryHandler(game_settings_callback, pattern="^(set_blinds|set_seats)$", block=False, filters=not_banned))
-    application.add_handler(CallbackQueryHandler(game_settings_value_callback, pattern="^(blind_|seats_)", block=False, filters=not_banned))
+    application.add_handler(CallbackQueryHandler(join_callback, pattern="^join_game$"))
+    application.add_handler(CallbackQueryHandler(start_early_callback, pattern="^start_early$"))
+    application.add_handler(CallbackQueryHandler(action_callback, pattern="^action_"))
+    application.add_handler(CallbackQueryHandler(action_callback, pattern="^(confirm_all_in|cancel_all_in)$"))
+    application.add_handler(CallbackQueryHandler(bet_amount_callback, pattern="^bet_amount_"))
+    application.add_handler(CallbackQueryHandler(new_game_callback, pattern="^new_game$"))
+    application.add_handler(CallbackQueryHandler(game_settings_callback, pattern="^(set_blinds|set_seats)$"))
+    application.add_handler(CallbackQueryHandler(game_settings_value_callback, pattern="^(blind_|seats_)"))
 
     # Menu & Shop
-    application.add_handler(CallbackQueryHandler(menu_callback, pattern="^menu_", block=False, filters=not_banned))
-    application.add_handler(CallbackQueryHandler(shop_callback, pattern="^(shop_|gold_exchange_|table_)", block=False, filters=not_banned))
-    application.add_handler(CallbackQueryHandler(gold_buy_callback, pattern="^gold_buy_", block=False, filters=not_banned))
-    application.add_handler(CallbackQueryHandler(chips_ad_callback, pattern="^chips_", block=False, filters=not_banned))
-    application.add_handler(CallbackQueryHandler(language_callback, pattern="^lang_", block=False, filters=not_banned))
-    application.add_handler(CallbackQueryHandler(daily_bonus_callback, pattern="^daily_bonus$", block=False, filters=not_banned))
-    application.add_handler(CallbackQueryHandler(inventory_callback, pattern="^inv_", block=False, filters=not_banned))
+    application.add_handler(CallbackQueryHandler(menu_callback, pattern="^menu_"))
+    application.add_handler(CallbackQueryHandler(shop_callback, pattern="^(shop_|gold_exchange_|table_)"))
+    application.add_handler(CallbackQueryHandler(gold_buy_callback, pattern="^gold_buy_"))
+    application.add_handler(CallbackQueryHandler(chips_ad_callback, pattern="^chips_"))
+    application.add_handler(CallbackQueryHandler(language_callback, pattern="^lang_"))
+    application.add_handler(CallbackQueryHandler(daily_bonus_callback, pattern="^daily_bonus$"))
+    application.add_handler(CallbackQueryHandler(inventory_callback, pattern="^inv_"))
 
     # Kaspi (admin callbacks work without filter)
-    application.add_handler(CallbackQueryHandler(kaspi_callback, pattern="^kaspi_", block=False, filters=not_banned))
+    application.add_handler(CallbackQueryHandler(kaspi_callback, pattern="^kaspi_"))
     application.add_handler(CallbackQueryHandler(admin_kaspi_callback, pattern="^admin_kaspi_|^admin_approve_|^admin_reject_|^admin_view_payment_"))
     application.add_handler(CallbackQueryHandler(admin_issues_callback, pattern="^(admin_issues|admin_view_issue_|admin_reply_issue_)"))
 
