@@ -12,7 +12,7 @@ from game_state import Game, Player, GamePhase, active_games, TURN_TIME
 from database import (
     get_player, update_stats, init_db, add_gold, buy_skin, set_skin, 
     buy_table_skin, set_table_skin, set_language, player_exists,
-    add_coins, set_luck_multiplier, DB_NAME
+    add_coins, set_luck_multiplier, DB_NAME, check_ad_cooldown, update_ad_cooldown
 )
 from keyboards import (
     get_registration_keyboard, get_bet_amounts_keyboard,
@@ -3393,9 +3393,9 @@ async def chips_ad_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             print(f"DEBUG chips_ad_callback: User {user.id} triggered watch ad")
             
-            # Check rate limiting
-            allowed, remaining = await _check_ad_rate_limit(user.id)
-            print(f"DEBUG rate limit: allowed={allowed}, remaining={remaining}")
+            # Check 24-hour cooldown from database
+            allowed, remaining = await check_ad_cooldown(user.id, cooldown_seconds=86400)
+            print(f"DEBUG ad cooldown: allowed={allowed}, remaining={remaining}")
             if not allowed:
                 # Convert seconds to hours and minutes
                 hours = remaining // 3600
@@ -3669,6 +3669,10 @@ async def chips_ad_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Enough time passed - user watched the video, give reward
             context.user_data['ad_reward_claimed'] = True
             await add_coins(user.id, 3000)
+            
+            # Update 24-hour cooldown in database
+            await update_ad_cooldown(user.id)
+            
             await query.answer(
                 f"✅ +3000 chips credited!" if lang == "en" else f"✅ +3000 фишек начислено!",
                 show_alert=True

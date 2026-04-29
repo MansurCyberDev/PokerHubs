@@ -36,6 +36,37 @@ async def is_user_banned(user_id: int) -> bool:
             return await cursor.fetchone() is not None
 
 
+async def check_ad_cooldown(user_id: int, cooldown_seconds: int = 86400) -> tuple[bool, int]:
+    """Check if user can watch ad. Returns (allowed, seconds_remaining)."""
+    async with aiosqlite.connect(DB_NAME) as db:
+        async with db.execute(
+            'SELECT last_watched_at FROM ad_cooldowns WHERE user_id = ?',
+            (user_id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            if not row:
+                return True, 0
+            
+            last_watched = datetime.fromisoformat(row[0])
+            elapsed = (datetime.now() - last_watched).total_seconds()
+            remaining = int(cooldown_seconds - elapsed)
+            
+            if remaining > 0:
+                return False, remaining
+            return True, 0
+
+
+async def update_ad_cooldown(user_id: int) -> bool:
+    """Update user's ad watch timestamp."""
+    async with aiosqlite.connect(DB_NAME) as db:
+        await db.execute('''
+            INSERT OR REPLACE INTO ad_cooldowns (user_id, last_watched_at)
+            VALUES (?, ?)
+        ''', (user_id, datetime.now().isoformat()))
+        await db.commit()
+        return True
+
+
 async def find_user_by_username(username: str) -> Optional[Dict]:
     """Найти пользователя по username."""
     async with aiosqlite.connect(DB_NAME) as db:
@@ -186,6 +217,13 @@ async def init_db():
                 reason TEXT,
                 banned_by INTEGER,
                 banned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS ad_cooldowns (
+                user_id INTEGER PRIMARY KEY,
+                last_watched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
 
