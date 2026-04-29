@@ -1,7 +1,7 @@
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
-from handlers import _user_lang
+from handlers import _user_lang, _check_banned_callback
 from keyboards import (get_admin_requests_panel_keyboard, get_admin_payment_action_keyboard, 
                        get_admin_payment_view_keyboard, get_admin_issues_panel_keyboard,
                        get_admin_pending_issues_keyboard, get_admin_pending_list_keyboard,
@@ -31,6 +31,10 @@ kaspi_pending_receipts = {}  # user_id -> payment_id
 
 async def kaspi_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle Kaspi Pay callbacks - chips and gold packages."""
+    # Check if user is banned
+    if await _check_banned_callback(update, context):
+        return
+    
     query = update.callback_query
     await query.answer()
     user = update.effective_user

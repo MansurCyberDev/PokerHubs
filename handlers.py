@@ -61,6 +61,32 @@ AD_COOLDOWN_SECONDS = 60
 CREATOR_ONLY_ALERT = "Только создатель может изменять параметры игры и запускать её."
 
 
+async def _check_banned_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Check if user is banned in callback. Returns True if banned and handled."""
+    user = update.effective_user
+    query = update.callback_query
+    
+    if not user:
+        return False
+    
+    from database import is_user_banned
+    if await is_user_banned(user.id):
+        lang = await _user_lang(user.id)
+        ban_message = (
+            "🚫 <b>Вы забанены в PokerHubs</b>\n"
+            "════════════════════\n\n"
+            "Вы не можете использовать функции бота.\n\n"
+            "Для разбана обратитесь к администрации."
+        )
+        try:
+            await query.answer("🚫 Вы забанены!" if lang == "en" else "🚫 Вы забанены!", show_alert=True)
+            await context.bot.send_message(user.id, ban_message, parse_mode=ParseMode.HTML)
+        except Exception:
+            pass
+        return True
+    return False
+
+
 async def _get_video_duration(video_path: str) -> float:
     """Get video duration using ffprobe with caching (async-safe)"""
     global _video_duration_cache
@@ -673,6 +699,10 @@ async def join_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def start_early_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Check if user is banned
+    if await _check_banned_callback(update, context):
+        return
+    
     query = update.callback_query
     chat_id = update.effective_chat.id
 
@@ -955,6 +985,10 @@ async def notify_turn(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
 
 
 async def action_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Check if user is banned
+    if await _check_banned_callback(update, context):
+        return
+    
     query = update.callback_query
     await query.answer()
     
@@ -1177,6 +1211,10 @@ async def action_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def bet_amount_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Check if user is banned
+    if await _check_banned_callback(update, context):
+        return
+    
     query = update.callback_query
     await query.answer()
 
@@ -1728,6 +1766,10 @@ async def handle_showdown(context, chat_id: int):
 
 
 async def new_game_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Check if user is banned
+    if await _check_banned_callback(update, context):
+        return
+    
     query = update.callback_query
     await query.answer()
 
@@ -2633,6 +2675,10 @@ async def checkuser_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Navigation callbacks for the DM main menu with history tracking."""
+    # Check if user is banned
+    if await _check_banned_callback(update, context):
+        return
+    
     query = update.callback_query
     await query.answer()
     user = update.effective_user
@@ -2872,6 +2918,10 @@ async def _handle_shop_page(query, context, user, lang, page_key, back_button):
 
 
 async def game_settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Check if user is banned
+    if await _check_banned_callback(update, context):
+        return
+    
     query = update.callback_query
     await query.answer()
     chat_id = update.effective_chat.id
@@ -2910,6 +2960,10 @@ async def game_settings_callback(update: Update, context: ContextTypes.DEFAULT_T
 
 
 async def game_settings_value_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Check if user is banned
+    if await _check_banned_callback(update, context):
+        return
+    
     query = update.callback_query
     await query.answer()
     chat_id = update.effective_chat.id
@@ -2952,6 +3006,10 @@ async def game_settings_value_callback(update: Update, context: ContextTypes.DEF
 
 async def shop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Buy or equip card and table skins."""
+    # Check if user is banned
+    if await _check_banned_callback(update, context):
+        return
+    
     query = update.callback_query
     await query.answer()
     user = update.effective_user
@@ -3354,6 +3412,10 @@ async def shop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def gold_buy_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Demo gold purchase handler."""
+    # Check if user is banned
+    if await _check_banned_callback(update, context):
+        return
+    
     query = update.callback_query
     user = update.effective_user
     lang = await _user_lang(user.id)
@@ -3377,6 +3439,10 @@ async def gold_buy_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def chips_ad_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle chips rewarded video ad."""
+    # Check if user is banned
+    if await _check_banned_callback(update, context):
+        return
+    
     query = update.callback_query
     user = update.effective_user
     lang = await _user_lang(user.id)
@@ -3738,6 +3804,10 @@ async def chips_ad_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def daily_bonus_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle daily bonus casino slot machine with dynamic win rates."""
+    # Check if user is banned
+    if await _check_banned_callback(update, context):
+        return
+    
     query = update.callback_query
     user = update.effective_user
     lang = await _user_lang(user.id)
@@ -3945,6 +4015,10 @@ async def daily_bonus_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
 async def language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Language selection handler."""
+    # Check if user is banned
+    if await _check_banned_callback(update, context):
+        return
+    
     query = update.callback_query
     user = update.effective_user
     lang = query.data.replace("lang_", "")
@@ -4029,6 +4103,10 @@ async def _show_tables_category(query, user, lang):
 
 async def inventory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle inventory equip callbacks."""
+    # Check if user is banned
+    if await _check_banned_callback(update, context):
+        return
+    
     query = update.callback_query
     await query.answer()
     user = update.effective_user
