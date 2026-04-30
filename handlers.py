@@ -994,6 +994,7 @@ async def action_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     user = update.effective_user
     data = query.data
+    lang = await _user_lang(user.id)
     
     # Handle all-in confirmation/cancellation
     if data == "confirm_all_in":
@@ -1058,7 +1059,6 @@ async def action_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             player = game.players[game.current_player_idx]
             if player.stack > 500:  # Protection threshold
                 await query.answer()
-                lang = await _user_lang(user.id)
                 text = (
                     f"🔥 <b>ПОДТВЕРДИ ALL-IN</b>\n"
                     f"════════════════════\n\n"
