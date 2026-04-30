@@ -967,19 +967,24 @@ async def notify_turn(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
     expected_phase = game.phase
 
     async def auto_fold():
-        await asyncio.sleep(TURN_TIME)
-        current_game = active_games.get(chat_id)
-        if not current_game or current_game.phase == GamePhase.WAITING:
-            return
-        current_player = current_game.players[current_game.current_player_idx]
-        if current_game.phase != expected_phase or current_player.user_id != expected_user_id:
-            return
-        if expected_user_id not in user_active_games:
-            return
-        if current_game.current_player_idx not in current_game.pending_to_act:
-            return
-        if not current_player.folded and not current_player.all_in:
-            await process_action(context, chat_id, "fold", 0, auto=True)
+        try:
+            await asyncio.sleep(TURN_TIME)
+            current_game = active_games.get(chat_id)
+            if not current_game or current_game.phase == GamePhase.WAITING:
+                return
+            current_player = current_game.players[current_game.current_player_idx]
+            if current_game.phase != expected_phase or current_player.user_id != expected_user_id:
+                return
+            if expected_user_id not in user_active_games:
+                return
+            if current_game.current_player_idx not in current_game.pending_to_act:
+                return
+            if not current_player.folded and not current_player.all_in:
+                await process_action(context, chat_id, "fold", 0, auto=True)
+        except Exception as e:
+            print(f"[AUTO_FOLD ERROR] {e}")
+            import traceback
+            traceback.print_exc()
 
     game.turn_timer = asyncio.create_task(auto_fold())
 
@@ -2289,7 +2294,7 @@ async def leave_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Active hand: fold if needed, then sit out
     # IMPORTANT: Clean up any pending actions for this player first
     game.pending_to_act.discard(idx)
-    
+
     if not player.folded and not player.all_in and game.current_player_idx == idx:
         # It's this player's turn - fold them
         try:
@@ -2298,14 +2303,19 @@ async def leave_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             print(f"Error auto-folding leaving player: {e}")
             player.folded = True
             game.pending_to_act.discard(idx)
-    
+
+    # Check if game ended after process_action (e.g., only one player left)
+    if chat_id not in active_games or game.phase == GamePhase.SHOWDOWN:
+        # Game already ended, don't send leave messages
+        return
+
     player.folded = True
     player.is_active = False
-    
+
     # Clean up pending_to_act from invalid indices
     valid_indices = set(range(len(game.players)))
     game.pending_to_act = {i for i in game.pending_to_act if i in valid_indices}
-    
+
     await update.message.reply_text(
         "✅ You left the table. You can rejoin in a new game."
         if lang == "en"
