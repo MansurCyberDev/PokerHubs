@@ -592,17 +592,22 @@ async def create_game(chat_id: int, user, context: ContextTypes.DEFAULT_TYPE):
             await asyncio.sleep(REGISTRATION_TIME)
         except asyncio.CancelledError:
             return  # Task was cancelled, exit gracefully
-        
-        if chat_id in active_games and active_games[chat_id].id == game_id and game.phase == GamePhase.WAITING:
-            if len(game.players) < MIN_PLAYERS:
-                await context.bot.send_message(
-                    chat_id,
-                    "❌ Недостаточно игроков. Игра отменена."
-                )
-                if active_games.get(chat_id) and active_games[chat_id].id == game_id:
-                    del active_games[chat_id]
-            else:
-                await start_game(context, chat_id)
+
+        try:
+            if chat_id in active_games and active_games[chat_id].id == game_id and game.phase == GamePhase.WAITING:
+                if len(game.players) < MIN_PLAYERS:
+                    await context.bot.send_message(
+                        chat_id,
+                        "❌ Недостаточно игроков. Игра отменена."
+                    )
+                    if active_games.get(chat_id) and active_games[chat_id].id == game_id:
+                        del active_games[chat_id]
+                else:
+                    await start_game(context, chat_id)
+        except Exception as e:
+            print(f"[CLOSE_REGISTRATION ERROR] {e}")
+            import traceback
+            traceback.print_exc()
 
     game.registration_task = asyncio.create_task(close_registration())
     return game
