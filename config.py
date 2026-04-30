@@ -1,7 +1,9 @@
 import os
 
-# Токен задается через ENV (можно также указать напрямую для разработки)
-TOKEN = os.getenv("POKER_BOT_TOKEN", "8633427504:AAGXYQm5HwAKO7zCUGx4FIC4VR9lN5_vUn8")
+# Токен задается через ENV (обязательно!)
+TOKEN = os.getenv("POKER_BOT_TOKEN", "")
+if not TOKEN:
+    raise ValueError("POKER_BOT_TOKEN environment variable is required")
 
 # Вставь сюда свой ID (или несколько через запятую) для админ-прав
 ADMIN_IDS = [int(x.strip()) for x in os.getenv("POKER_ADMIN_IDS", "5491969475").split(",") if x.strip()]
